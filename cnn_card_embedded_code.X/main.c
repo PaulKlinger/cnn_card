@@ -99,12 +99,56 @@ void usart_spi_init(){
 }
 
 void usart_shift_out(char data) {
-    VPORTB.OUT &= ~PIN3_bm;
-    
     while (!(USART0.STATUS & USART_DREIF_bm)){}
     USART0.TXDATAL = data;
+    _delay_us(5); // wait until data has been shifted out, should do something useful here!
+    VPORTB.OUT |= PIN0_bm;
+    VPORTB.OUT &= ~PIN0_bm;
+}
+
+void usart_shift_out_2(char data1, char data2) {
+    while (!(USART0.STATUS & USART_DREIF_bm)){}
+    USART0.TXDATAL = data1;
+    while (!(USART0.STATUS & USART_DREIF_bm)){}
+    USART0.TXDATAL = data2;
+    _delay_us(15); // wait until data has been shifted out, should do something useful here!
+    VPORTB.OUT |= PIN0_bm;
+    VPORTB.OUT &= ~PIN0_bm;
+}
+
+
+void test_leds() {
+    uint8_t row_index = 0;
+    uint8_t col_index = 0;
     
-    VPORTB.OUT |= PIN3_bm;
+    char shift_byte_1;
+    char shift_byte_2;
+    
+    while (1) {
+        if (row_index == 8) {
+            VPORTC.OUT &= ~PIN5_bm;
+            shift_byte_2 = 255;
+        } else {
+            VPORTC.OUT |= PIN5_bm;
+            shift_byte_2 = ~(1<<(7-row_index));
+        }
+        
+        if (col_index == 8) {
+            VPORTC.OUT |= PIN4_bm;
+            shift_byte_1 = 0;
+        } else {
+            VPORTC.OUT &= ~PIN4_bm;
+            shift_byte_1 = (1<<(7-col_index));
+        }
+        usart_shift_out_2(shift_byte_1, shift_byte_2);
+        
+        col_index += 1;
+        if (col_index >= 9) {
+            col_index = 0;
+            row_index = (row_index + 1) % 9;
+        }
+        //_delay_ms(50);
+    }
 }
 
 
@@ -172,11 +216,22 @@ int main(void) {
     
     usart_spi_init();
     
-    VPORTB.DIR |= PIN1_bm | PIN2_bm | PIN3_bm ;
+    VPORTB.DIR |= (PIN0_bm | PIN1_bm | PIN2_bm | PIN4_bm | PIN5_bm | PIN6_bm);
+    VPORTC.DIR |= (PIN2_bm | PIN4_bm | PIN5_bm);
+    
+    /* shift register output enable */
+    VPORTC.OUT &= PIN2_bm;
+    
+    /* turn on single leds */
+    VPORTB.OUT &= ~(PIN4_bm | PIN5_bm | PIN6_bm);
+    
+    test_leds();
+    
+    
     while (1) {
         for (int i=0; i < 8; i++) {
             usart_shift_out(~(1 << i));
-            _delay_us(1000);
+            _delay_ms(50);
         }
     }
     
