@@ -108,7 +108,7 @@
         <property key="default-bitfield-type" value="true"/>
         <property key="default-char-type" value="true"/>
         <property key="extra-include-directories" value=""/>
-        <property key="extra-warnings" value="false"/>
+        <property key="extra-warnings" value="true"/>
         <property key="garbage-collect-data" value="true"/>
         <property key="garbage-collect-functions" value="true"/>
         <property key="inhibit-all" value="false"/>
@@ -122,7 +122,7 @@
         <property key="save-temps" value="false"/>
         <property key="short-calls" value="false"/>
         <property key="short-enums" value="true"/>
-        <property key="strict-ansi" value="false"/>
+        <property key="strict-ansi" value="true"/>
         <property key="strict-ansi-errors" value="false"/>
         <property key="support-ansi" value="false"/>
         <property key="syntax-only" value="false"/>
@@ -188,6 +188,8 @@
         <property key="memories.programmemory" value="true"/>
         <property key="memories.programmemory.ranges" value="0-3fff"/>
         <property key="poweroptions.powerenable" value="false"/>
+        <property key="programmerToGoFilePath"
+                  value="C:/Users/kling/Insync/klinger.paul@gmail.com/Google Drive/hardware/cnn_card/cnn_card_embedded_code.X/debug/default/cnn_card_embedded_code_ptg"/>
         <property key="programmerToGoImageName" value="cnn_card_embedded_code_ptg"/>
         <property key="programoptions.donoteraseauxmem" value="false"/>
         <property key="programoptions.eraseb4program" value="true"/>

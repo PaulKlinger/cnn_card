@@ -12,6 +12,7 @@
 #include <avr/sleep.h>
 #include <avr/interrupt.h>
 
+
 FUSES = 
 {
 	.APPEND = 0,
@@ -22,6 +23,9 @@ FUSES =
 	.SYSCFG1 = SUT_64MS_gc,
 	.WDTCFG = PERIOD_OFF_gc | WINDOW_OFF_gc,
 };
+
+#define DEBOUNCE_THRESHOLD 5
+#define HELD_FLAG 100
 
 
 volatile uint8_t test_led_brightness = 7;
@@ -91,8 +95,8 @@ void usart_spi_init(){
     USART0.CTRLA = 0;
     USART0.CTRLB |= USART_TXEN_bm; /* enable TX (but not RX) */
     
-    /* change mode to master SPI, LSb first */
-    USART0.CTRLC = USART_CMODE_MSPI_gc | USART_UDORD_bm; 
+    /* change mode to master SPI */
+    USART0.CTRLC = USART_CMODE_MSPI_gc ; 
     
     /* set baud factor to 1 -> f_baud = 2MHz for CLK_PER = 4MHz*/
     USART0.BAUDL = (1 << 6);
@@ -116,36 +120,116 @@ void usart_shift_out_2(char data1, char data2) {
     VPORTB.OUT &= ~PIN0_bm;
 }
 
+static int8_t last_pressed = -1;
+static uint8_t debounce_counter = 0;
 
-void test_leds() {
-    uint8_t row_index = 0;
+void read_buttons(uint8_t led_data[]){
+
+    
+    int8_t pressed = -1;
+    for (uint8_t row_index=0; row_index < 5; row_index++) {
+        
+        VPORTA.DIR = (1 << (row_index + 1));
+        
+        // not sure if .OUT gets reset on .DIR change
+        // if not could skip this and just set all low
+        VPORTA.OUT = ~(1 << (row_index + 1));
+        
+        // TODO: check how short I can make this
+        _delay_us(10);
+        
+        // this takes a variable amount of time, not sure if good idea
+        if (~VPORTA.IN & PIN6_bm) {
+            pressed = row_index * 5 + 0;
+        } else if (~VPORTA.IN & PIN7_bm) {
+            pressed = row_index * 5 + 1;
+        } else if (~VPORTC.IN & PIN0_bm) {
+            pressed = row_index * 5 + 2;
+        } else if (~VPORTC.IN & PIN1_bm) {
+            pressed = row_index * 5 + 3;
+        } else if (~VPORTC.IN & PIN3_bm) { // yes, PIN3 is correct...
+            pressed = row_index * 5 + 4;
+        }
+        
+        if (pressed != -1) {
+            if (pressed == last_pressed) {
+                if (debounce_counter != HELD_FLAG){
+                    debounce_counter++;
+                }
+            } else {
+                debounce_counter = 0;
+                last_pressed = pressed;
+            }
+            break;
+        }
+    }
+    if (pressed == -1) {
+        // no button press detected
+        debounce_counter = 0;
+        last_pressed = -1;
+    }
+    
+    if (debounce_counter == DEBOUNCE_THRESHOLD) {
+        debounce_counter = HELD_FLAG;
+        
+        uint8_t byte_idx = (last_pressed % 5) * 2;
+        uint8_t bit_idx = last_pressed / 5;
+
+        if (led_data[byte_idx] & (1 << bit_idx)) {
+            led_data[byte_idx] &= ~(1 << bit_idx);
+        } else {
+            led_data[byte_idx] |= (1 << bit_idx);
+        }
+    }
+}
+
+
+void test_leds_and_buttons() {
+    
+    /* 1st byte is col0 0-7, 2nd byte col0 8, 3rd byte col1 0-7,...  */
+    uint8_t led_data[18] = {0};
+    
+    led_data[0] |= 1;
+    led_data[1 * 2] |= (1 << 1);
+    led_data[2 * 2] |= (1 << 3);
+    led_data[4 * 2] |= (1 << 4);
+    
     uint8_t col_index = 0;
     
     char shift_byte_1;
     char shift_byte_2;
     
     while (1) {
-        if (row_index == 8) {
-            VPORTC.OUT &= ~PIN5_bm;
-            shift_byte_2 = 255;
-        } else {
-            VPORTC.OUT |= PIN5_bm;
-            shift_byte_2 = ~(1<<(7-row_index));
-        }
+
         
+        /* set column */
         if (col_index == 8) {
             VPORTC.OUT |= PIN4_bm;
             shift_byte_1 = 0;
         } else {
             VPORTC.OUT &= ~PIN4_bm;
-            shift_byte_1 = (1<<(7-col_index));
+            shift_byte_1 = (1 << col_index);
         }
+        
+        
+                
+       /* set active rows */
+        if (led_data[2 * col_index + 1]) {
+            VPORTC.OUT &= ~PIN5_bm;
+        } else {
+            VPORTC.OUT |= PIN5_bm;
+        }
+        
+        shift_byte_2 = ~led_data[2 * col_index];
+        
+
         usart_shift_out_2(shift_byte_1, shift_byte_2);
         
-        col_index += 1;
-        if (col_index >= 9) {
+
+        col_index++;
+        if (col_index > 8) {
             col_index = 0;
-            row_index = (row_index + 1) % 9;
+            read_buttons(led_data);
         }
         //_delay_ms(50);
     }
@@ -220,12 +304,13 @@ int main(void) {
     VPORTC.DIR |= (PIN2_bm | PIN4_bm | PIN5_bm);
     
     /* shift register output enable */
+    usart_shift_out_2(255, 255);
     VPORTC.OUT &= PIN2_bm;
     
-    /* turn on single leds */
-    VPORTB.OUT &= ~(PIN4_bm | PIN5_bm | PIN6_bm);
+    ///* turn off single leds */
+    VPORTB.OUT |= (PIN4_bm | PIN5_bm | PIN6_bm);
     
-    test_leds();
+    test_leds_and_buttons();
     
     
     while (1) {
