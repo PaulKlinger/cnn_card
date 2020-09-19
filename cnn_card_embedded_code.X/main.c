@@ -24,8 +24,15 @@ FUSES =
 	.WDTCFG = PERIOD_OFF_gc | WINDOW_OFF_gc,
 };
 
+
+// config options
 #define DEBOUNCE_THRESHOLD 5
+
+
+// flag values
 #define HELD_FLAG 100
+#define FILTER_BUTTON 25
+#define PWR_BUTTON 26
 
 
 volatile uint8_t test_led_brightness = 7;
@@ -35,30 +42,33 @@ volatile  uint8_t led_row =0;
 volatile  uint8_t led_pwm_cycle_counter =0;
 
 ISR(PORTB_PORT_vect) {
-    test_led_brightness = (test_led_brightness + 1) % 8;
     /* clear interrupt flag */
     VPORTB.INTFLAGS |= PORT_INT3_bm;
 }
 
 
-
-ISR(RTC_PIT_vect) 
-{   
-    VPORTB.OUT |= PIN0_bm;
-    VPORTB.OUT &= ~PIN1_bm;
-    
-    led_pwm_cycle_counter++;
-    if (led_pwm_cycle_counter == 8) {
-        led_pwm_cycle_counter = 0;
-        led_row = (led_row + 1) % 10;
-    }
-    
-    if (led_row == 0 && led_pwm_cycle_counter <= test_led_brightness) {
-        VPORTB.OUT &= ~PIN0_bm;
-    }
-    /* TRIGB interrupt flag has to be cleared manually */
-    RTC.PITINTFLAGS = RTC_PI_bm;
-}
+/* RTC ISR for PWM, not used
+ * this just wastes cycles on entering / leaving the ISR
+ * we don't really need to do anything else except PWM for most of the time
+ * so just do it in the main loop
+ */
+//ISR(RTC_PIT_vect) 
+//{   
+//    VPORTB.OUT |= PIN0_bm;
+//    VPORTB.OUT &= ~PIN1_bm;
+//    
+//    led_pwm_cycle_counter++;
+//    if (led_pwm_cycle_counter == 8) {
+//        led_pwm_cycle_counter = 0;
+//        led_row = (led_row + 1) % 10;
+//    }
+//    
+//    if (led_row == 0 && led_pwm_cycle_counter <= test_led_brightness) {
+//        VPORTB.OUT &= ~PIN0_bm;
+//    }
+//    /* TRIGB interrupt flag has to be cleared manually */
+//    RTC.PITINTFLAGS = RTC_PI_bm;
+//}
 
 void shift_out(char data) {
     /* latch (STCP) low */
@@ -125,6 +135,29 @@ static uint8_t debounce_counter = 0;
 
 static uint8_t global_brightness = 1; // just for testing
 
+void turn_off_leds() {
+    usart_shift_out_2(0, 255);
+    VPORTC.OUT |= PIN5_bm;
+    VPORTC.OUT &= ~PIN4_bm;
+    VPORTB.OUT |= (PIN4_bm | PIN5_bm | PIN6_bm);
+}
+
+void go_to_sleep() {
+    /* Go to sleep, wakeup on PWR button press
+     * unfortunately synchronous pins like PB3 can only wake the chip
+     * with BOTHEDGES or LEVEL interrupts, so we have to wait until the
+     * button is released (and no longer bouncing) before going to sleep.
+     */
+    while (~PORTB.IN & PIN3_bm) {}
+    _delay_ms(50);
+    set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+    sleep_enable();
+    sleep_cpu();
+    while (~PORTB.IN & PIN3_bm) {}
+    _delay_ms(50);
+}
+
+
 void read_buttons(uint8_t led_data[]){
 
     
@@ -154,18 +187,29 @@ void read_buttons(uint8_t led_data[]){
         }
         
         if (pressed != -1) {
-            if (pressed == last_pressed) {
-                if (debounce_counter != HELD_FLAG){
-                    debounce_counter++;
-                }
-            } else {
-                debounce_counter = 0;
-                last_pressed = pressed;
-            }
             break;
         }
     }
     if (pressed == -1) {
+        // test power & filter buttons
+        if (~VPORTB.IN & PIN7_bm) {
+            pressed = FILTER_BUTTON;
+        } else if (~VPORTB.IN & PIN3_bm) {
+            pressed = PWR_BUTTON;
+        }
+    }
+    
+    if (pressed != -1) {
+        // found a button press
+        if (pressed == last_pressed) {
+            if (debounce_counter != HELD_FLAG){
+                debounce_counter++;
+            }
+        } else {
+            debounce_counter = 0;
+            last_pressed = pressed;
+        }
+    } else {
         // no button press detected
         debounce_counter = 0;
         last_pressed = -1;
@@ -174,17 +218,19 @@ void read_buttons(uint8_t led_data[]){
     if (debounce_counter == DEBOUNCE_THRESHOLD) {
         debounce_counter = HELD_FLAG;
         
-        if (last_pressed == 0) {
+        if (last_pressed == FILTER_BUTTON) {
             global_brightness = ((global_brightness + 1) % 8);
-        }
-        
-        uint8_t byte_idx = (last_pressed % 5) * 2;
-        uint8_t bit_idx = last_pressed / 5;
-
-        if (led_data[byte_idx] & (1 << bit_idx)) {
-            led_data[byte_idx] &= ~(1 << bit_idx);
+        } else if (last_pressed == PWR_BUTTON) {
+            go_to_sleep();
         } else {
-            led_data[byte_idx] |= (1 << bit_idx);
+            uint8_t byte_idx = (last_pressed % 5) * 2;
+            uint8_t bit_idx = last_pressed / 5;
+
+            if (led_data[byte_idx] & (1 << bit_idx)) {
+                led_data[byte_idx] &= ~(1 << bit_idx);
+            } else {
+                led_data[byte_idx] |= (1 << bit_idx);
+            }
         }
     }
 }
@@ -240,11 +286,12 @@ void test_leds_and_buttons() {
         
         // turn off leds (otherwise last col is brighter
         // because of button scan time)
-        usart_shift_out_2(0, 255);
-        VPORTC.OUT |= PIN5_bm;
-        VPORTC.OUT &= ~PIN4_bm;
+        turn_off_leds();
         
         read_buttons(led_data);
+        
+        // turn on single leds
+        VPORTB.OUT &= ~(PIN4_bm | PIN5_bm | PIN6_bm);
     }
 }
 
@@ -256,8 +303,6 @@ int main(void) {
             CLKCTRL_PDIV_4X_gc /* Prescaler division: 4X */
             | CLKCTRL_PEN_bm /* Prescaler enable: enabled */
             );
-    
-    VPORTB.DIR = 0;
     
     /* Enable pullups for low power consumption (20uA -> 0.1uA (afair))*/
     PORTA.PIN0CTRL |= PORT_PULLUPEN_bm;
@@ -291,20 +336,12 @@ int main(void) {
     
     
     
-    //PORTB.PIN3CTRL |= PORT_PULLUPEN_bm;
-    /* Enable interrupt falling */
-    //PORTB.PIN3CTRL = (PORTB.PIN3CTRL & ~PORT_ISC_gm) | PORT_ISC_FALLING_gc;
-    
-    //VPORTA.DIR = PIN1_bm | PIN2_bm | PIN3_bm;
-    //VPORTA.OUT = 0;
-    
-    //VPORTB.DIR |= PIN0_bm | PIN1_bm;
-    //VPORTB.OUT |= (PIN0_bm | PIN1_bm);
+    /* Enable interrupt on power button
+     * (this is only for wakeup)*/
+    PORTB.PIN3CTRL = (PORTB.PIN3CTRL & ~PORT_ISC_gm) | PORT_ISC_BOTHEDGES_gc;
+    sei();
     
     //rtc0_init();
-    
-    led_row = 0;
-    led_pwm_cycle_counter = 0;
     
     //sei();
     //while (1) {
@@ -319,7 +356,7 @@ int main(void) {
     VPORTC.OUT &= ~PIN4_bm;
     VPORTC.OUT |= PIN5_bm;
     
-    VPORTB.DIR |= (PIN0_bm | PIN1_bm | PIN2_bm | PIN4_bm | PIN5_bm | PIN6_bm);
+    VPORTB.DIR = (PIN0_bm | PIN1_bm | PIN2_bm | PIN4_bm | PIN5_bm | PIN6_bm);
     VPORTC.DIR |= (PIN2_bm | PIN4_bm | PIN5_bm);
     
     
@@ -329,18 +366,18 @@ int main(void) {
     /* shift register output enable */
     VPORTC.OUT &= ~PIN2_bm;
     
-    ///* turn off single leds */
+    /* turn on single leds */
     VPORTB.OUT &= ~(PIN4_bm | PIN5_bm | PIN6_bm);
     
     test_leds_and_buttons();
     
     
-    while (1) {
-        for (int i=0; i < 8; i++) {
-            usart_shift_out(~(1 << i));
-            _delay_ms(50);
-        }
-    }
+//    while (1) {
+//        for (int i=0; i < 8; i++) {
+//            usart_shift_out(~(1 << i));
+//            _delay_ms(50);
+//        }
+//    }
     
     /*
     set_sleep_mode(SLEEP_MODE_PWR_DOWN);
