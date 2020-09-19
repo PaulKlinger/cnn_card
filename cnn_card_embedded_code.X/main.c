@@ -123,6 +123,8 @@ void usart_shift_out_2(char data1, char data2) {
 static int8_t last_pressed = -1;
 static uint8_t debounce_counter = 0;
 
+static uint8_t global_brightness = 1; // just for testing
+
 void read_buttons(uint8_t led_data[]){
 
     
@@ -172,6 +174,10 @@ void read_buttons(uint8_t led_data[]){
     if (debounce_counter == DEBOUNCE_THRESHOLD) {
         debounce_counter = HELD_FLAG;
         
+        if (last_pressed == 0) {
+            global_brightness = ((global_brightness + 1) % 8);
+        }
+        
         uint8_t byte_idx = (last_pressed % 5) * 2;
         uint8_t bit_idx = last_pressed / 5;
 
@@ -188,50 +194,57 @@ void test_leds_and_buttons() {
     
     /* 1st byte is col0 0-7, 2nd byte col0 8, 3rd byte col1 0-7,...  */
     uint8_t led_data[18] = {0};
+    for (uint8_t i = 0; i < 18; i++) {
+        led_data[i] = 255;
+    }
     
-    led_data[0] |= 1;
-    led_data[1 * 2] |= (1 << 1);
-    led_data[2 * 2] |= (1 << 3);
-    led_data[4 * 2] |= (1 << 4);
-    
-    uint8_t col_index = 0;
     
     char shift_byte_1;
     char shift_byte_2;
     
     while (1) {
+        for (uint8_t pwm_idx=0; pwm_idx < 8; pwm_idx++) {
+            for (uint8_t col_idx=0; col_idx <= 8; col_idx++){
+                if (pwm_idx >= global_brightness) {
+                    VPORTC.OUT &= ~PIN4_bm;
+                    VPORTC.OUT |= PIN5_bm;
+                    usart_shift_out_2(0, 255);
+                    continue;
+                }
+                /* set column */
+                if (col_idx == 8) {
+                    VPORTC.OUT |= PIN4_bm;
+                    shift_byte_1 = 0;
+                } else {
+                    VPORTC.OUT &= ~PIN4_bm;
+                    shift_byte_1 = (1 << col_idx);
+                }
 
-        
-        /* set column */
-        if (col_index == 8) {
-            VPORTC.OUT |= PIN4_bm;
-            shift_byte_1 = 0;
-        } else {
-            VPORTC.OUT &= ~PIN4_bm;
-            shift_byte_1 = (1 << col_index);
-        }
-        
-        
-                
-       /* set active rows */
-        if (led_data[2 * col_index + 1]) {
-            VPORTC.OUT &= ~PIN5_bm;
-        } else {
-            VPORTC.OUT |= PIN5_bm;
-        }
-        
-        shift_byte_2 = ~led_data[2 * col_index];
-        
+               /* set active rows */
+                if (led_data[2 * col_idx + 1]) {
+                    VPORTC.OUT &= ~PIN5_bm;
+                } else {
+                    VPORTC.OUT |= PIN5_bm;
+                }
 
-        usart_shift_out_2(shift_byte_1, shift_byte_2);
-        
+                shift_byte_2 = ~led_data[2 * col_idx];
 
-        col_index++;
-        if (col_index > 8) {
-            col_index = 0;
-            read_buttons(led_data);
+
+                usart_shift_out_2(shift_byte_1, shift_byte_2);
+            }
         }
-        //_delay_ms(50);
+        // TODO: tweak this so the last pwm tick of the last col
+        //       is the same length as the others
+        _delay_us(4);
+        
+        
+        // turn off leds (otherwise last col is brighter
+        // because of button scan time)
+        usart_shift_out_2(0, 255);
+        VPORTC.OUT |= PIN5_bm;
+        VPORTC.OUT &= ~PIN4_bm;
+        
+        read_buttons(led_data);
     }
 }
 
@@ -300,15 +313,24 @@ int main(void) {
     
     usart_spi_init();
     
+    // shift register output disable
+    VPORTC.OUT |= PIN2_bm;
+    // GPIO led row/col off
+    VPORTC.OUT &= ~PIN4_bm;
+    VPORTC.OUT |= PIN5_bm;
+    
     VPORTB.DIR |= (PIN0_bm | PIN1_bm | PIN2_bm | PIN4_bm | PIN5_bm | PIN6_bm);
     VPORTC.DIR |= (PIN2_bm | PIN4_bm | PIN5_bm);
     
-    /* shift register output enable */
+    
+    // send led off command
     usart_shift_out_2(255, 255);
-    VPORTC.OUT &= PIN2_bm;
+    
+    /* shift register output enable */
+    VPORTC.OUT &= ~PIN2_bm;
     
     ///* turn off single leds */
-    VPORTB.OUT |= (PIN4_bm | PIN5_bm | PIN6_bm);
+    VPORTB.OUT &= ~(PIN4_bm | PIN5_bm | PIN6_bm);
     
     test_leds_and_buttons();
     
