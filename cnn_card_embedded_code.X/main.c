@@ -27,6 +27,7 @@ FUSES =
 
 // config options
 #define DEBOUNCE_THRESHOLD 5
+#define AUTO_SHUTDOWN_TIME_s 60 * 2 // 2 min
 
 
 // flag values
@@ -35,69 +36,23 @@ FUSES =
 #define PWR_BUTTON 26
 
 
-volatile uint8_t test_led_brightness = 7;
-
-
-volatile  uint8_t led_row =0;
-volatile  uint8_t led_pwm_cycle_counter =0;
-
 ISR(PORTB_PORT_vect) {
     /* clear interrupt flag */
     VPORTB.INTFLAGS |= PORT_INT3_bm;
 }
 
 
-/* RTC ISR for PWM, not used
- * this just wastes cycles on entering / leaving the ISR
- * we don't really need to do anything else except PWM for most of the time
- * so just do it in the main loop
- */
-//ISR(RTC_PIT_vect) 
-//{   
-//    VPORTB.OUT |= PIN0_bm;
-//    VPORTB.OUT &= ~PIN1_bm;
-//    
-//    led_pwm_cycle_counter++;
-//    if (led_pwm_cycle_counter == 8) {
-//        led_pwm_cycle_counter = 0;
-//        led_row = (led_row + 1) % 10;
-//    }
-//    
-//    if (led_row == 0 && led_pwm_cycle_counter <= test_led_brightness) {
-//        VPORTB.OUT &= ~PIN0_bm;
-//    }
-//    /* TRIGB interrupt flag has to be cleared manually */
-//    RTC.PITINTFLAGS = RTC_PI_bm;
-//}
-
-void shift_out(char data) {
-    /* latch (STCP) low */
-    
-    VPORTB.OUT &= ~(PIN1_bm | PIN2_bm | PIN3_bm);
-    
-    for (int i=0;i < 8; i++) {
-        if (data & (1 << i)) {
-            VPORTB.OUT |= PIN2_bm;
-        } else {
-            VPORTB.OUT &= ~PIN2_bm;
-        }
-        VPORTB.OUT |= PIN1_bm;
-        VPORTB.OUT &= ~PIN1_bm;
-    }
-    
-    VPORTB.OUT |= PIN3_bm;
-}
-
 void rtc0_init(){
     while (RTC.STATUS > 0) { /* Wait for all register to be synchronized */}
     RTC.CLKSEL = RTC_CLKSEL_INT32K_gc; /* Clock Select: Internal 32kHz OSC */
-    while (RTC.PITSTATUS > 0) { /* Wait for all register to be synchronized */}
-    RTC.PITCTRLA = RTC_PERIOD_CYC4_gc /* Period: RTC Clock Cycles 256 */
-    				| 1 << RTC_PITEN_bp; /* Enable: enabled */
-    RTC.PITINTCTRL = 1 << RTC_PI_bp; /* Periodic Interrupt: enabled */
-    RTC.CTRLA = RTC_PRESCALER_DIV1_gc /* Prescaling Factor: RTC Clock / 1 */
-    				| 1 << RTC_RTCEN_bp /* Enable: enabled */
-    				| 0 << RTC_RUNSTDBY_bp; /* Run In Standby: disabled */
+    
+    /* 10 min period 
+     * (should never reach this, as we reset on auto shutdown at <10 min)
+     */
+    RTC.PER = 60 * 10; 
+    RTC.CTRLA = RTC_PRESCALER_DIV32768_gc/* Prescaling Factor: RTC Clock / 32768 */
+                | 1 << RTC_RTCEN_bp /* Enable: enabled */
+                | 0 << RTC_RUNSTDBY_bp; /* Run In Standby: disabled */
 }
 
 
@@ -130,8 +85,6 @@ void usart_shift_out_2(char data1, char data2) {
     VPORTB.OUT &= ~PIN0_bm;
 }
 
-static int8_t last_pressed = -1;
-static uint8_t debounce_counter = 0;
 
 static uint8_t global_brightness = 1; // just for testing
 
@@ -140,6 +93,12 @@ void turn_off_leds() {
     VPORTC.OUT |= PIN5_bm;
     VPORTC.OUT &= ~PIN4_bm;
     VPORTB.OUT |= (PIN4_bm | PIN5_bm | PIN6_bm);
+}
+
+void reset_rtc_cnt() {
+    // reset RTC (auto shutdown counter)
+    while (RTC.STATUS & RTC_CNTBUSY_bm) {}
+    RTC.CNT = 0;
 }
 
 void go_to_sleep() {
@@ -155,11 +114,14 @@ void go_to_sleep() {
     sleep_cpu();
     while (~PORTB.IN & PIN3_bm) {}
     _delay_ms(50);
+    
+    reset_rtc_cnt();
 }
 
 
 void read_buttons(uint8_t led_data[]){
-
+    static int8_t last_pressed = -1;
+    static uint8_t debounce_counter = 0;
     
     int8_t pressed = -1;
     for (uint8_t row_index=0; row_index < 5; row_index++) {
@@ -201,6 +163,9 @@ void read_buttons(uint8_t led_data[]){
     
     if (pressed != -1) {
         // found a button press
+        
+        reset_rtc_cnt();
+        
         if (pressed == last_pressed) {
             if (debounce_counter != HELD_FLAG){
                 debounce_counter++;
@@ -287,6 +252,10 @@ void test_leds_and_buttons() {
         // turn off leds (otherwise last col is brighter
         // because of button scan time)
         turn_off_leds();
+        if (RTC.CNT > AUTO_SHUTDOWN_TIME_s) {
+            turn_off_leds();
+            go_to_sleep();
+        }
         
         read_buttons(led_data);
         
@@ -341,7 +310,7 @@ int main(void) {
     PORTB.PIN3CTRL = (PORTB.PIN3CTRL & ~PORT_ISC_gm) | PORT_ISC_BOTHEDGES_gc;
     sei();
     
-    //rtc0_init();
+    rtc0_init();
     
     //sei();
     //while (1) {
@@ -360,8 +329,10 @@ int main(void) {
     VPORTC.DIR |= (PIN2_bm | PIN4_bm | PIN5_bm);
     
     
-    // send led off command
-    usart_shift_out_2(255, 255);
+    turn_off_leds();
+    
+    // sleep
+    go_to_sleep();
     
     /* shift register output enable */
     VPORTC.OUT &= ~PIN2_bm;
@@ -371,30 +342,4 @@ int main(void) {
     
     test_leds_and_buttons();
     
-    
-//    while (1) {
-//        for (int i=0; i < 8; i++) {
-//            usart_shift_out(~(1 << i));
-//            _delay_ms(50);
-//        }
-//    }
-    
-    /*
-    set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-    sleep_enable();
-    
-    sei();
-    
-    while (1) {
-        for (int j=0; j < 3; j++){
-            for (int i=0; i < 8; i++) {
-                shift_out(~(1 << i));
-                _delay_ms(100);
-            }
-        }
-        shift_out(255);
-        sleep_cpu();
-    }
-
-    */
 }
