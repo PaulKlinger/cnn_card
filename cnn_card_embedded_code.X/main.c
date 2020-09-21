@@ -30,6 +30,7 @@ FUSES =
 #define AUTO_SHUTDOWN_TIME_s 60 * 2 // 2 min
 
 #define LED_COUNT 5 * 5 + 4 * 4 + 3 * 3 + 2 * 2 + 16 + 10 + 4
+#define PWM_BITS 4
 
 
 // flag values
@@ -38,23 +39,25 @@ FUSES =
 #define PWR_BUTTON 26
 
 /* 3-bit brightness values for each led*/
-uint8_t led_status[LED_COUNT * 3 / 8 + 1] = {0};
+uint8_t led_status[LED_COUNT * PWM_BITS / 8 + 1] = {0};
 
 uint8_t get_led_brightness(uint8_t row, uint8_t col) {
-    uint8_t start_idx = (row * 9 + col) * 3;
-    uint8_t bit0 = !!(led_status[start_idx / 8] & (1 << (start_idx % 8)));
-    uint8_t bit1 = !!(led_status[(start_idx + 1) / 8] & (1 << ((start_idx + 1) % 8)));
-    uint8_t bit2 = !!(led_status[(start_idx + 2) / 8] & (1 << ((start_idx + 2) % 8)));
+    uint16_t start_idx = (row * 9 + col) * PWM_BITS;
+    uint8_t out = 0;
     
-    return bit0 + (bit1 << 1) + (bit2 << 2);
+    for (uint8_t i=0; i < PWM_BITS; i++) {
+        out += (!!(led_status[(start_idx + i) / 8] & (1 << ((start_idx + i) % 8)))) << i;
+    }
+    
+    return out;
 }
 
 
 void set_led_brightness(uint8_t row, uint8_t col, uint8_t val) {
-    uint8_t start_idx = (row * 9 + col) * 3;
-    for (uint8_t i = 0; i < 3; i++){
+    uint16_t start_idx = (row * 9 + col) * PWM_BITS;
+    for (uint8_t i = 0; i < PWM_BITS; i++){
         if (val & (1 << i)) {
-            led_status[(start_idx + i)/ 8] |= (1 << ((start_idx + i) % 8));
+            led_status[(start_idx + i) / 8] |= (1 << ((start_idx + i) % 8));
         } else {
             led_status[(start_idx + i) / 8] &= ~(1 << ((start_idx + i) % 8));
         }
@@ -62,7 +65,7 @@ void set_led_brightness(uint8_t row, uint8_t col, uint8_t val) {
 }
 
 
-uint8_t row_shift_bytes[8 * 9];
+uint8_t row_shift_bytes[(1 << PWM_BITS) * 9];
 
 uint8_t row8_setting[9];
 
@@ -71,7 +74,7 @@ void update_pwm_pattern() {
         for (uint8_t col=0; col <= 8; col++) {
             uint8_t brightness = get_led_brightness(row, col);
             
-            for (uint8_t pwm_index=0; pwm_index < 8; pwm_index++) {
+            for (uint8_t pwm_index=0; pwm_index < (1 << PWM_BITS); pwm_index++) {
                 if (pwm_index < brightness) {
                     if (row == 8){
                         row8_setting[col] |= (1 << pwm_index);
@@ -245,7 +248,7 @@ void read_buttons(){
 
             set_led_brightness(
                     row, col,
-                    (get_led_brightness(row, col) + 1) % 8
+                    (get_led_brightness(row, col) + 1) % (1 << PWM_BITS)
             );
             update_pwm_pattern();
         }
@@ -259,7 +262,7 @@ void test_leds_and_buttons() {
     update_pwm_pattern();
     
     while (1) {
-        for (uint8_t pwm_idx=0; pwm_idx < 8; pwm_idx++) {
+        for (uint8_t pwm_idx=0; pwm_idx < (1 << PWM_BITS); pwm_idx++) {
             for (uint8_t col_idx=0; col_idx <= 8; col_idx++){
                 /* set column */
                 if (col_idx == 8) {
