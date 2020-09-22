@@ -68,7 +68,7 @@ void set_led_brightness(uint8_t row, uint8_t col, uint8_t val) {
 uint8_t row_shift_bytes[(1 << PWM_BITS) * 9];
 uint8_t col_shift_bytes[9];
 
-uint8_t row8_setting[9];
+uint8_t row8_brightness[9];
 
 void init_col_shift_bytes() {
     // set column select shift pattern for first 8 cols
@@ -83,17 +83,12 @@ void update_pwm_pattern() {
     for (uint8_t row=0; row <= 8; row++) {
         for (uint8_t col=0; col <= 8; col++) {
             uint8_t brightness = get_led_brightness(row, col);
-            
-            for (uint8_t pwm_index=0; pwm_index < (1 << PWM_BITS); pwm_index++) {
-                if (pwm_index < brightness) {
-                    if (row == 8){
-                        row8_setting[col] |= (1 << pwm_index);
-                    } else {
+            if (row == 8) {
+                row8_brightness[col] = brightness;
+            } else {
+                for (uint8_t pwm_index=0; pwm_index < (1 << PWM_BITS); pwm_index++) {
+                    if (pwm_index < brightness) {
                         row_shift_bytes[9 * pwm_index + col] &= ~(1 << (row % 8));
-                    }
-                } else {
-                    if (row == 8) {
-                        row8_setting[col] &= ~(1 << pwm_index);
                     } else {
                         row_shift_bytes[9 * pwm_index + col] |= (1 << (row % 8));
                     }
@@ -290,7 +285,7 @@ void test_leds_and_buttons() {
                 }
 
                /* set row8 */
-                if (row8_setting[col_idx] & (1 << pwm_idx)) {
+                if (pwm_idx < row8_brightness[col_idx]) {
                     next_vportc &= ~PIN5_bm;
                 } else {
                     next_vportc |= PIN5_bm;
@@ -303,7 +298,7 @@ void test_leds_and_buttons() {
                 // if we are still too early wait until everything is shifted out
                 // could do this in an ISR, but not sure if register store/load
                 // would be slower than this wait
-                while (~USART0.STATUS & USART_TXCIF_bm) {}
+                while (!(USART0.STATUS & USART_TXCIF_bm)) {}
                 // need to clear transmit complete flag manually
                 USART0.STATUS |= USART_TXCIF_bm;
                 VPORTB.OUT |= PIN0_bm;
@@ -316,10 +311,6 @@ void test_leds_and_buttons() {
                 
                 set_vportc = next_vportc;
             }
-            /* TODO: col 8 is brighter than others 
-             * because of additional time to go to next pwm loop iteration.
-             * Could just switch to combined loop?? Or handle in software?
-             */
         }
         // pulse SCK & set portc for last iteration  
         _delay_us(8);
