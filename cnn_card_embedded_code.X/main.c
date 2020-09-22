@@ -30,7 +30,7 @@ FUSES =
 #define AUTO_SHUTDOWN_TIME_s 60 * 2 // 2 min
 
 #define LED_COUNT 5 * 5 + 4 * 4 + 3 * 3 + 2 * 2 + 16 + 10 + 4
-#define PWM_BITS 4
+#define PWM_BITS 5
 
 
 // flag values
@@ -66,8 +66,18 @@ void set_led_brightness(uint8_t row, uint8_t col, uint8_t val) {
 
 
 uint8_t row_shift_bytes[(1 << PWM_BITS) * 9];
+uint8_t col_shift_bytes[9];
 
 uint8_t row8_setting[9];
+
+void init_col_shift_bytes() {
+    // set column select shift pattern for first 8 cols
+    // don't compute this dynamically to make pwm cycles more even
+    for (uint8_t col=0; col < 8; col++) {
+        col_shift_bytes[col] = (1 << col);
+    }
+    col_shift_bytes[8] = 0;
+}
 
 void update_pwm_pattern() {
     for (uint8_t row=0; row <= 8; row++) {
@@ -257,37 +267,65 @@ void read_buttons(){
 
 
 void test_leds_and_buttons() {
-    char shift_byte_1;
+    uint8_t set_vportc = VPORTC.OUT;
+    uint8_t next_vportc = VPORTC.OUT;
+    
+    for (uint8_t row=0; row < 9; row++) {
+        for (uint8_t col=0; col < 9; col++) {
+            set_led_brightness(row, col, 1);
+        }
+    }
     
     update_pwm_pattern();
+    init_col_shift_bytes();
     
     while (1) {
         for (uint8_t pwm_idx=0; pwm_idx < (1 << PWM_BITS); pwm_idx++) {
             for (uint8_t col_idx=0; col_idx <= 8; col_idx++){
                 /* set column */
                 if (col_idx == 8) {
-                    VPORTC.OUT |= PIN4_bm;
-                    shift_byte_1 = 0;
+                    next_vportc = VPORTC.OUT | PIN4_bm;
                 } else {
-                    VPORTC.OUT &= ~PIN4_bm;
-                    shift_byte_1 = (1 << col_idx);
+                    next_vportc = VPORTC.OUT & ~PIN4_bm;
                 }
 
                /* set row8 */
                 if (row8_setting[col_idx] & (1 << pwm_idx)) {
-                    VPORTC.OUT &= ~PIN5_bm;
+                    next_vportc &= ~PIN5_bm;
                 } else {
-                    VPORTC.OUT |= PIN5_bm;
+                    next_vportc |= PIN5_bm;
                 }
                 
-                usart_shift_out_2(
-                        shift_byte_1,
-                        row_shift_bytes[9 * pwm_idx + col_idx]);
+                // pulse SCK, setting pattern from last iteration
+                // this gives time for data to be shifted out while we do the
+                // calcs above
+                
+                // if we are still too early wait until everything is shifted out
+                // could do this in an ISR, but not sure if register store/load
+                // would be slower than this wait
+                while (~USART0.STATUS & USART_TXCIF_bm) {}
+                // need to clear transmit complete flag manually
+                USART0.STATUS |= USART_TXCIF_bm;
+                VPORTB.OUT |= PIN0_bm;
+                VPORTB.OUT &= ~PIN0_bm;
+                VPORTC.OUT = set_vportc;
+                
+                USART0.TXDATAL = col_shift_bytes[col_idx];
+                while (!(USART0.STATUS & USART_DREIF_bm)){}
+                USART0.TXDATAL = row_shift_bytes[9 * pwm_idx + col_idx];
+                
+                set_vportc = next_vportc;
             }
+            /* TODO: col 8 is brighter than others 
+             * because of additional time to go to next pwm loop iteration.
+             * Could just switch to combined loop?? Or handle in software?
+             */
         }
-        // TODO: tweak this so the last pwm tick of the last col
-        //       is the same length as the others
-        _delay_us(4);
+        // pulse SCK & set portc for last iteration  
+        _delay_us(8);
+        VPORTC.OUT = set_vportc;
+        VPORTB.OUT |= PIN0_bm;
+        VPORTB.OUT &= ~PIN0_bm;
         
         
         // turn off leds (otherwise last col is brighter
