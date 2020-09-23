@@ -31,6 +31,7 @@ FUSES =
 
 #define LED_COUNT 5 * 5 + 4 * 4 + 3 * 3 + 2 * 2 + 16 + 10 + 4
 #define PWM_BITS 5
+#define N_FILTERS 16
 
 
 // flag values
@@ -40,6 +41,16 @@ FUSES =
 
 /* 3-bit brightness values for each led*/
 uint8_t led_status[LED_COUNT * PWM_BITS / 8 + 1] = {0};
+
+/* precomputed bytes to shift out during main loop*/
+uint8_t row_shift_bytes[(1 << PWM_BITS) * 9];
+uint8_t col_shift_bytes[9];
+
+/* brightness of row8 leds (not controlled via shift register) */
+uint8_t row8_brightness[9];
+
+uint8_t filter_idx = 0;
+
 
 uint8_t get_led_brightness(uint8_t row, uint8_t col) {
     uint16_t start_idx = (row * 9 + col) * PWM_BITS;
@@ -64,11 +75,6 @@ void set_led_brightness(uint8_t row, uint8_t col, uint8_t val) {
     }
 }
 
-
-uint8_t row_shift_bytes[(1 << PWM_BITS) * 9];
-uint8_t col_shift_bytes[9];
-
-uint8_t row8_brightness[9];
 
 void init_col_shift_bytes() {
     // set column select shift pattern for first 8 cols
@@ -100,6 +106,7 @@ void update_pwm_pattern() {
 
 
 ISR(PORTB_PORT_vect) {
+    /* This is only used to wake the MCU, so we do nothing here. */
     /* clear interrupt flag */
     VPORTB.INTFLAGS |= PORT_INT3_bm;
 }
@@ -130,34 +137,35 @@ void usart_spi_init(){
     USART0.BAUDL = (1 << 6);
 }
 
-void usart_shift_out(char data) {
-    while (!(USART0.STATUS & USART_DREIF_bm)){}
-    USART0.TXDATAL = data;
-    _delay_us(5); // wait until data has been shifted out, should do something useful here!
-    VPORTB.OUT |= PIN0_bm;
-    VPORTB.OUT &= ~PIN0_bm;
-}
-
-void usart_shift_out_2(char data1, char data2) {
-    while (!(USART0.STATUS & USART_DREIF_bm)){}
-    USART0.TXDATAL = data1;
-    while (!(USART0.STATUS & USART_DREIF_bm)){}
-    USART0.TXDATAL = data2;
-    _delay_us(15); // wait until data has been shifted out, should do something useful here!
-    VPORTB.OUT |= PIN0_bm;
-    VPORTB.OUT &= ~PIN0_bm;
-}
 
 void turn_off_leds() {
-    usart_shift_out_2(0, 255);
+    /* shift out pattern for all leds off*/
+    /* wait for tx buffer ready*/
+    while (!(USART0.STATUS & USART_DREIF_bm)){}
+    USART0.TXDATAL = 0;
+    while (!(USART0.STATUS & USART_DREIF_bm)){}
+    USART0.TXDATAL = 255;
+    /* wait until everything is shifted out */
+    _delay_us(15);
+    /* pulse SCK */
+    VPORTB.OUT |= PIN0_bm;
+    VPORTB.OUT &= ~PIN0_bm;
+    
+    /* turn off GPIO controlled row/col 8 */
     VPORTC.OUT |= PIN5_bm;
     VPORTC.OUT &= ~PIN4_bm;
-    VPORTB.OUT |= (PIN4_bm | PIN5_bm | PIN6_bm);
+    
+    /* turn off individual leds 
+     * (change to input to remember value) */
+    VPORTB.DIR &= ~(PIN4_bm | PIN5_bm | PIN6_bm);
 }
 
 void reset_rtc_cnt() {
-    // reset RTC (auto shutdown counter)
-    while (RTC.STATUS & RTC_CNTBUSY_bm) {}
+    /* reset RTC (auto shutdown counter) */
+    
+    while (RTC.STATUS & RTC_CNTBUSY_bm) {
+        /* wait for registers to be ready for writing*/
+    }
     RTC.CNT = 0;
 }
 
@@ -192,7 +200,8 @@ void read_buttons(){
         // if not could skip this and just set all low
         VPORTA.OUT = ~(1 << (row_index + 1));
         
-        // TODO: check how short I can make this
+        /* TODO: check how short I can make this 
+         * (need some delay or first col is not read correctly) */
         _delay_us(10);
         
         // this takes a variable amount of time, not sure if good idea
@@ -209,11 +218,12 @@ void read_buttons(){
         }
         
         if (pressed != -1) {
+            /* we stop at the first button */
             break;
         }
     }
     if (pressed == -1) {
-        // test power & filter buttons
+        // test power & filter buttons (separate GPIOs)
         if (~VPORTB.IN & PIN7_bm) {
             pressed = FILTER_BUTTON;
         } else if (~VPORTB.IN & PIN3_bm) {
@@ -222,8 +232,9 @@ void read_buttons(){
     }
     
     if (pressed != -1) {
-        // found a button press
+        /* found a button press */
         
+        /* reset auto shutdown counter */
         reset_rtc_cnt();
         
         if (pressed == last_pressed) {
@@ -244,7 +255,8 @@ void read_buttons(){
         debounce_counter = HELD_FLAG;
         
         if (last_pressed == FILTER_BUTTON) {
-            // -- 
+            filter_idx = (filter_idx + 1) % N_FILTERS;
+            set_filter_leds();
         } else if (last_pressed == PWR_BUTTON) {
             go_to_sleep();
         } else {
@@ -261,7 +273,24 @@ void read_buttons(){
 }
 
 
-void test_leds_and_buttons() {
+void set_filter_leds() {
+    if (filter_idx & 1) {PORTB.OUT &= ~PIN6_bm;}
+    else {PORTB.OUT |= PIN6_bm;}
+    
+    if (filter_idx & (1 << 1)) {PORTB.OUT &= ~PIN4_bm;}
+    else {PORTB.OUT |= PIN4_bm;}
+    
+    if (filter_idx & (1 << 2)) {PORTB.OUT &= ~PIN5_bm;}
+    else {PORTB.OUT |= PIN5_bm;}
+    
+    if (filter_idx & (1 << 3)) {set_led_brightness(8, 0, (1 << PWM_BITS) - 1);}
+    else {set_led_brightness(8, 0, 0);}
+    
+    update_pwm_pattern();
+}
+
+
+void main_loop() {
     uint8_t set_vportc = VPORTC.OUT;
     uint8_t next_vportc = VPORTC.OUT;
     
@@ -276,16 +305,16 @@ void test_leds_and_buttons() {
     
     while (1) {
         for (uint8_t pwm_idx=0; pwm_idx < (1 << PWM_BITS); pwm_idx++) {
-            for (uint8_t col_idx=0; col_idx <= 8; col_idx++){
+            for (uint8_t col=0; col <= 8; col++){
                 /* set column */
-                if (col_idx == 8) {
+                if (col == 8) {
                     next_vportc = VPORTC.OUT | PIN4_bm;
                 } else {
                     next_vportc = VPORTC.OUT & ~PIN4_bm;
                 }
 
                /* set row8 */
-                if (pwm_idx < row8_brightness[col_idx]) {
+                if (pwm_idx < row8_brightness[col]) {
                     next_vportc &= ~PIN5_bm;
                 } else {
                     next_vportc |= PIN5_bm;
@@ -305,9 +334,9 @@ void test_leds_and_buttons() {
                 VPORTB.OUT &= ~PIN0_bm;
                 VPORTC.OUT = set_vportc;
                 
-                USART0.TXDATAL = col_shift_bytes[col_idx];
+                USART0.TXDATAL = col_shift_bytes[col];
                 while (!(USART0.STATUS & USART_DREIF_bm)){}
-                USART0.TXDATAL = row_shift_bytes[9 * pwm_idx + col_idx];
+                USART0.TXDATAL = row_shift_bytes[9 * pwm_idx + col];
                 
                 set_vportc = next_vportc;
             }
@@ -330,7 +359,7 @@ void test_leds_and_buttons() {
         read_buttons();
         
         // turn on single leds
-        VPORTB.OUT &= ~(PIN4_bm | PIN5_bm | PIN6_bm);
+        VPORTB.DIR |= (PIN4_bm | PIN5_bm | PIN6_bm);
     }
 }
 
@@ -407,9 +436,7 @@ int main(void) {
     /* shift register output enable */
     VPORTC.OUT &= ~PIN2_bm;
     
-    /* turn on single leds */
-    VPORTB.OUT &= ~(PIN4_bm | PIN5_bm | PIN6_bm);
     
-    test_leds_and_buttons();
+    main_loop();
     
 }
