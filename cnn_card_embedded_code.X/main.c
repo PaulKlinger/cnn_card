@@ -1,16 +1,12 @@
-/*
- * File:   main.c
- * Author: kling
- *
- * Created on 30 May 2020, 14:04
- */
-
 #define F_CPU 4000000
 
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/sleep.h>
 #include <avr/interrupt.h>
+
+#include "tensor.h"
+#include "model_weights.h"
 
 
 FUSES = 
@@ -276,9 +272,8 @@ void read_buttons(){
             uint8_t row = last_pressed / 5;
             uint8_t col = last_pressed % 5;
 
-            set_led_brightness(
-                    row, col,
-                    (get_led_brightness(row, col) + 1) % (1 << PWM_BITS)
+            set_led_brightness(row, col,
+                (get_led_brightness(row, col) == 0) ? ((1 << PWM_BITS) - 1) : 0
             );
             update_pwm_pattern();
         }
@@ -290,7 +285,7 @@ void main_loop() {
     
     for (uint8_t row=0; row < 9; row++) {
         for (uint8_t col=0; col < 9; col++) {
-            set_led_brightness(row, col, 1);
+            set_led_brightness(row, col, (1 << PWM_BITS) - 1);
         }
     }
     
@@ -363,6 +358,52 @@ void main_loop() {
     }
 }
 
+const float test_input_data[] = {
+       1, 1, 0, 0, 0,
+       0, 0, 0, 0, 0,
+       0, 0, 1, 0, 0,
+       0, 0, 1, 1, 0,
+       0, 0, 1, 0, 1
+    };
+const uint8_t test_input_shape[] = {5, 5, 1};
+const struct float_4tensor test_input = {
+    .data=(float*) test_input_data,
+    .s0=5,
+    .s1=5,
+    .s2=1,
+    .s3=1
+};
+
+
+void test_tensor_fns() {
+    volatile float ker0102 = t4_get_value(&conv0_kernel, 0, 1, 0, 2);
+    float res_data[4 * 4 * 4] = {0};
+    struct float_4tensor res = {
+        .data=(float*) res_data,
+        .s0=4, // rows
+        .s1=4, // cols
+        .s2=4, // channels
+        .s3=1
+    };
+    
+    t4_convolve_2x2(&test_input, &conv0_kernel, &res);
+    
+    t4_add_conv_bias(&res, &conv0_bias);
+    
+    t4_relu(&res);
+    
+    volatile float res000 = t4_get_value(&res, 0, 0, 0, 0);
+    volatile float res213 = t4_get_value(&res, 2, 1, 3, 0);
+    
+    
+    
+    float test_counter = 0;
+    while (1){
+        test_counter += 0.3;
+        _delay_ms(10);
+    }
+}
+
 
 int main(void) {
       /* Configure clock prescaler for 4MHz  */
@@ -371,6 +412,8 @@ int main(void) {
             CLKCTRL_PDIV_4X_gc /* Prescaler division: 4X */
             | CLKCTRL_PEN_bm /* Prescaler enable: enabled */
             );
+    
+    test_tensor_fns();
     
     /* Enable pullups for low power consumption (20uA -> 0.1uA (afair))*/
     PORTA.PIN0CTRL |= PORT_PULLUPEN_bm;
