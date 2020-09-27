@@ -377,23 +377,92 @@ const struct float_4tensor test_input = {
 
 void test_tensor_fns() {
     volatile float ker0102 = t4_get_value(&conv0_kernel, 0, 1, 0, 2);
-    float res_data[4 * 4 * 4] = {0};
-    struct float_4tensor res = {
-        .data=(float*) res_data,
+    float conv0_out_data[4 * 4 * 4] = {0};
+    struct float_4tensor conv0_out = {
+        .data=(float*) conv0_out_data,
         .s0=4, // rows
         .s1=4, // cols
         .s2=4, // channels
         .s3=1
     };
     
-    t4_convolve_2x2(&test_input, &conv0_kernel, &res);
+    t4_convolve_2x2(&test_input, &conv0_kernel, &conv0_out);
     
-    t4_add_conv_bias(&res, &conv0_bias);
+    t4_add_conv_bias(&conv0_out, &conv0_bias);
     
-    t4_relu(&res);
+    t4_relu(&conv0_out);
     
-    volatile float res000 = t4_get_value(&res, 0, 0, 0, 0);
-    volatile float res213 = t4_get_value(&res, 2, 1, 3, 0);
+    volatile float conv0_out_0_0_0 = t4_get_value(&conv0_out, 0, 0, 0, 0);
+    volatile float conv0_out_0_1_3 = t4_get_value(&conv0_out, 0, 1, 3, 0);
+    
+    float conv1_out_data[3 * 3 * 8] = {0};
+    struct float_4tensor conv1_out = {
+        .data=(float*) conv1_out_data,
+        .s0=3, // rows
+        .s1=3, // cols
+        .s2=8, // channels
+        .s3=1
+    };
+    
+    t4_convolve_2x2(&conv0_out, &conv1_kernel, &conv1_out);
+    
+    t4_add_conv_bias(&conv1_out, &conv1_bias);
+    
+    t4_relu(&conv1_out);
+    
+    volatile float conv1_out_0_0_0 = t4_get_value(&conv1_out, 0, 0, 0, 0);
+    volatile float conv1_out_0_2_7 = t4_get_value(&conv1_out, 0, 2, 7, 0);
+    
+    float conv2_out_data[2 * 2 * 16] = {0};
+    struct float_4tensor conv2_out = {
+        .data=(float*) conv2_out_data,
+        .s0=2, // rows
+        .s1=2, // cols
+        .s2=16, // channels
+        .s3=1
+    };
+    
+    t4_convolve_2x2(&conv1_out, &conv2_kernel, &conv2_out);
+    
+    t4_add_conv_bias(&conv2_out, &conv2_bias);
+    
+    t4_relu(&conv2_out);
+    
+    volatile float conv2_out_0_0_0 = t4_get_value(&conv2_out, 0, 0, 0, 0);
+    volatile float conv2_out_0_1_10 = t4_get_value(&conv2_out, 0, 1, 10, 0);
+    
+    
+    float pool_out_data[16] = {0};
+    struct float_4tensor pool_out = {
+        .data=(float*) pool_out_data,
+        .s0=16, // channels
+        .s1=1,
+        .s2=1,
+        .s3=1
+    };
+    
+    t4_max_pool(&conv2_out, &pool_out);
+    volatile float pool_out_0 = t4_get_value(&pool_out, 0, 0, 0, 0);
+    volatile float pool_out_6 = t4_get_value(&pool_out, 6, 0, 0, 0);
+    
+    float dense_out_data[16] = {0};
+    struct float_4tensor dense_out = {
+        .data=(float*) dense_out_data,
+        .s0=10, // channels
+        .s1=1,
+        .s2=1,
+        .s3=1
+    };
+    
+    t4_matrix_mult(&dense_kernel, &pool_out, &dense_out);
+    t4_add(&dense_out, &dense_bias);
+    t4_softmax(&dense_out);
+    
+    volatile float model_out_0 = t4_get_value(&dense_out, 0, 0, 0, 0);
+    volatile float model_out_1 = t4_get_value(&dense_out, 1, 0, 0, 0);
+    volatile float model_out_6 = t4_get_value(&dense_out, 6, 0, 0, 0);
+    volatile float model_out_9 = t4_get_value(&dense_out, 9, 0, 0, 0);
+    
     
     
     

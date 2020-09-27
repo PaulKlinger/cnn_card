@@ -30,10 +30,15 @@ void t4_set_value(
     float val
 );
 
-void matrix_mult(
+void t4_matrix_mult(
     const struct float_4tensor *m1,
     const struct float_4tensor *m2,
     struct float_4tensor *res
+);
+
+void t4_add(
+    struct float_4tensor *t1,
+    const struct float_4tensor *t2
 );
 
 void t4_add_conv_bias(
