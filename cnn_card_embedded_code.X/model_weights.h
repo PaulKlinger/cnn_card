@@ -14,8 +14,14 @@ extern "C" {
 
     struct float_4tensor conv0_kernel;
     struct float_4tensor conv0_bias;
-
-
+    struct float_4tensor conv1_kernel;
+    struct float_4tensor conv1_bias;
+    struct float_4tensor conv2_kernel;
+    struct float_4tensor conv2_bias;
+    struct float_4tensor dense_kernel;
+    struct float_4tensor dense_bias;
+    
+    
 #ifdef	__cplusplus
 }
 #endif
