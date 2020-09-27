@@ -4,39 +4,6 @@
 #include "tensor.h"
 
 
-float t4_get_value(
-    const struct float_4tensor *t,
-    uint8_t i0,
-    uint8_t i1,
-    uint8_t i2,
-    uint8_t i3
-) {
-    return t->data[
-          i0 * (t->s1 * t->s2 * t->s3)
-        + i1 * (t->s2 * t->s3)
-        + i2 * t->s3
-        + i3
-    ];
-}
-
-
-void t4_set_value(
-    const struct float_4tensor *t,
-    uint8_t i0,
-    uint8_t i1,
-    uint8_t i2,
-    uint8_t i3,
-    float val
-) {
-    t->data[
-          i0 * (t->s1 * t->s2 * t->s3)
-        + i1 * (t->s2 * t->s3)
-        + i2 * t->s3
-        + i3
-    ] = val;
-}
-
-
 void t4_add_conv_bias(
     struct float_4tensor *t,
     const struct float_4tensor *bias

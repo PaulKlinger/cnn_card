@@ -6,6 +6,9 @@
                    projectFiles="true">
       <itemPath>tensor.h</itemPath>
       <itemPath>model_weights.h</itemPath>
+      <itemPath>model.h</itemPath>
+      <itemPath>led_status.h</itemPath>
+      <itemPath>config.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LinkerScript"
                    displayName="Linker Files"
@@ -17,6 +20,8 @@
       <itemPath>main.c</itemPath>
       <itemPath>tensor.c</itemPath>
       <itemPath>model_weights.c</itemPath>
+      <itemPath>model.c</itemPath>
+      <itemPath>led_status.c</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"
@@ -124,7 +129,7 @@
         <property key="preprocessor-macros" value=""/>
         <property key="preprocessor-macros-undefined" value=""/>
         <property key="save-temps" value="false"/>
-        <property key="short-calls" value="false"/>
+        <property key="short-calls" value="true"/>
         <property key="short-enums" value="true"/>
         <property key="strict-ansi" value="true"/>
         <property key="strict-ansi-errors" value="false"/>

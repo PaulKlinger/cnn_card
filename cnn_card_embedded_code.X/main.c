@@ -5,8 +5,9 @@
 #include <avr/sleep.h>
 #include <avr/interrupt.h>
 
-#include "tensor.h"
-#include "model_weights.h"
+#include "model.h"
+#include "config.h"
+#include "led_status.h"
 
 
 FUSES = 
@@ -21,55 +22,14 @@ FUSES =
 };
 
 
-// config options
-#define DEBOUNCE_THRESHOLD 5
-#define AUTO_SHUTDOWN_TIME_s 60 * 2 // 2 min
-
-#define LED_COUNT 5 * 5 + 4 * 4 + 3 * 3 + 2 * 2 + 16 + 10 + 4
-#define PWM_BITS 5
-#define N_FILTERS 16
-
-
-// flag values
-#define HELD_FLAG 100
-#define FILTER_BUTTON 25
-#define PWR_BUTTON 26
-
-/* 3-bit brightness values for each led*/
-uint8_t led_status[LED_COUNT * PWM_BITS / 8 + 1] = {0};
-
 /* precomputed bytes to shift out during main loop*/
-uint8_t row_shift_bytes[(1 << PWM_BITS) * 9];
+uint8_t row_shift_bytes[(PWM_LEVELS) * 9];
 uint8_t col_shift_bytes[9];
 
 /* brightness of row8 leds (not controlled via shift register) */
 uint8_t row8_brightness[9];
 
 uint8_t filter_idx = 0;
-
-
-uint8_t get_led_brightness(uint8_t row, uint8_t col) {
-    uint16_t start_idx = (row * 9 + col) * PWM_BITS;
-    uint8_t out = 0;
-    
-    for (uint8_t i=0; i < PWM_BITS; i++) {
-        out += (!!(led_status[(start_idx + i) / 8] & (1 << ((start_idx + i) % 8)))) << i;
-    }
-    
-    return out;
-}
-
-
-void set_led_brightness(uint8_t row, uint8_t col, uint8_t val) {
-    uint16_t start_idx = (row * 9 + col) * PWM_BITS;
-    for (uint8_t i = 0; i < PWM_BITS; i++){
-        if (val & (1 << i)) {
-            led_status[(start_idx + i) / 8] |= (1 << ((start_idx + i) % 8));
-        } else {
-            led_status[(start_idx + i) / 8] &= ~(1 << ((start_idx + i) % 8));
-        }
-    }
-}
 
 
 void init_col_shift_bytes() {
@@ -81,6 +41,7 @@ void init_col_shift_bytes() {
     col_shift_bytes[8] = 0;
 }
 
+
 void update_pwm_pattern() {
     for (uint8_t row=0; row <= 8; row++) {
         for (uint8_t col=0; col <= 8; col++) {
@@ -88,7 +49,7 @@ void update_pwm_pattern() {
             if (row == 8) {
                 row8_brightness[col] = brightness;
             } else {
-                for (uint8_t pwm_index=0; pwm_index < (1 << PWM_BITS); pwm_index++) {
+                for (uint8_t pwm_index=0; pwm_index < (PWM_LEVELS); pwm_index++) {
                     if (pwm_index < brightness) {
                         row_shift_bytes[9 * pwm_index + col] &= ~(1 << (row % 8));
                     } else {
@@ -189,7 +150,7 @@ void set_filter_leds() {
     if (filter_idx & (1 << 2)) {PORTB.OUT &= ~PIN5_bm;}
     else {PORTB.OUT |= PIN5_bm;}
     
-    if (filter_idx & (1 << 3)) {set_led_brightness(8, 0, (1 << PWM_BITS) - 1);}
+    if (filter_idx & (1 << 3)) {set_led_brightness(8, 0, MAX_PWM_LEVEL);}
     else {set_led_brightness(8, 0, 0);}
     
     update_pwm_pattern();
@@ -271,11 +232,14 @@ void read_buttons(){
         } else {
             uint8_t row = last_pressed / 5;
             uint8_t col = last_pressed % 5;
-
+            
             set_led_brightness(row, col,
-                (get_led_brightness(row, col) == 0) ? ((1 << PWM_BITS) - 1) : 0
+                (get_led_brightness(row, col) == 0) ? MAX_PWM_LEVEL : 0
             );
+            
+            run_model_and_set_led_brightness();
             update_pwm_pattern();
+            
         }
     }
 }
@@ -285,17 +249,28 @@ void main_loop() {
     
     for (uint8_t row=0; row < 9; row++) {
         for (uint8_t col=0; col < 9; col++) {
-            set_led_brightness(row, col, (1 << PWM_BITS) - 1);
+            set_led_brightness(row, col, 0);
         }
     }
     
+    set_led_brightness(1, 1, MAX_PWM_LEVEL);
+    set_led_brightness(1, 2, MAX_PWM_LEVEL);
+    set_led_brightness(2, 2, MAX_PWM_LEVEL);
+    set_led_brightness(3, 1, MAX_PWM_LEVEL);
+    set_led_brightness(3, 2, MAX_PWM_LEVEL);
+    set_led_brightness(3, 3, MAX_PWM_LEVEL);
+    
+    run_model_and_set_led_brightness();
+    
+    set_filter_leds();
     update_pwm_pattern();
     init_col_shift_bytes();
+    
     
     while (1) {
         uint8_t set_vportc = VPORTC.OUT;
         uint8_t next_vportc = VPORTC.OUT;
-        for (uint8_t pwm_idx=0; pwm_idx < (1 << PWM_BITS); pwm_idx++) {
+        for (uint8_t pwm_idx=0; pwm_idx < PWM_LEVELS; pwm_idx++) {
             for (uint8_t col=0; col <= 8; col++){
                 /* set column */
                 if (col == 8) {
@@ -358,121 +333,6 @@ void main_loop() {
     }
 }
 
-const float test_input_data[] = {
-       1, 1, 0, 0, 0,
-       0, 0, 0, 0, 0,
-       0, 0, 1, 0, 0,
-       0, 0, 1, 1, 0,
-       0, 0, 1, 0, 1
-    };
-const uint8_t test_input_shape[] = {5, 5, 1};
-const struct float_4tensor test_input = {
-    .data=(float*) test_input_data,
-    .s0=5,
-    .s1=5,
-    .s2=1,
-    .s3=1
-};
-
-
-void test_tensor_fns() {
-    volatile float ker0102 = t4_get_value(&conv0_kernel, 0, 1, 0, 2);
-    float conv0_out_data[4 * 4 * 4] = {0};
-    struct float_4tensor conv0_out = {
-        .data=(float*) conv0_out_data,
-        .s0=4, // rows
-        .s1=4, // cols
-        .s2=4, // channels
-        .s3=1
-    };
-    
-    t4_convolve_2x2(&test_input, &conv0_kernel, &conv0_out);
-    
-    t4_add_conv_bias(&conv0_out, &conv0_bias);
-    
-    t4_relu(&conv0_out);
-    
-    volatile float conv0_out_0_0_0 = t4_get_value(&conv0_out, 0, 0, 0, 0);
-    volatile float conv0_out_0_1_3 = t4_get_value(&conv0_out, 0, 1, 3, 0);
-    
-    float conv1_out_data[3 * 3 * 8] = {0};
-    struct float_4tensor conv1_out = {
-        .data=(float*) conv1_out_data,
-        .s0=3, // rows
-        .s1=3, // cols
-        .s2=8, // channels
-        .s3=1
-    };
-    
-    t4_convolve_2x2(&conv0_out, &conv1_kernel, &conv1_out);
-    
-    t4_add_conv_bias(&conv1_out, &conv1_bias);
-    
-    t4_relu(&conv1_out);
-    
-    volatile float conv1_out_0_0_0 = t4_get_value(&conv1_out, 0, 0, 0, 0);
-    volatile float conv1_out_0_2_7 = t4_get_value(&conv1_out, 0, 2, 7, 0);
-    
-    float conv2_out_data[2 * 2 * 16] = {0};
-    struct float_4tensor conv2_out = {
-        .data=(float*) conv2_out_data,
-        .s0=2, // rows
-        .s1=2, // cols
-        .s2=16, // channels
-        .s3=1
-    };
-    
-    t4_convolve_2x2(&conv1_out, &conv2_kernel, &conv2_out);
-    
-    t4_add_conv_bias(&conv2_out, &conv2_bias);
-    
-    t4_relu(&conv2_out);
-    
-    volatile float conv2_out_0_0_0 = t4_get_value(&conv2_out, 0, 0, 0, 0);
-    volatile float conv2_out_0_1_10 = t4_get_value(&conv2_out, 0, 1, 10, 0);
-    
-    
-    float pool_out_data[16] = {0};
-    struct float_4tensor pool_out = {
-        .data=(float*) pool_out_data,
-        .s0=16, // channels
-        .s1=1,
-        .s2=1,
-        .s3=1
-    };
-    
-    t4_max_pool(&conv2_out, &pool_out);
-    volatile float pool_out_0 = t4_get_value(&pool_out, 0, 0, 0, 0);
-    volatile float pool_out_6 = t4_get_value(&pool_out, 6, 0, 0, 0);
-    
-    float dense_out_data[16] = {0};
-    struct float_4tensor dense_out = {
-        .data=(float*) dense_out_data,
-        .s0=10, // channels
-        .s1=1,
-        .s2=1,
-        .s3=1
-    };
-    
-    t4_matrix_mult(&dense_kernel, &pool_out, &dense_out);
-    t4_add(&dense_out, &dense_bias);
-    t4_softmax(&dense_out);
-    
-    volatile float model_out_0 = t4_get_value(&dense_out, 0, 0, 0, 0);
-    volatile float model_out_1 = t4_get_value(&dense_out, 1, 0, 0, 0);
-    volatile float model_out_6 = t4_get_value(&dense_out, 6, 0, 0, 0);
-    volatile float model_out_9 = t4_get_value(&dense_out, 9, 0, 0, 0);
-    
-    
-    
-    
-    float test_counter = 0;
-    while (1){
-        test_counter += 0.3;
-        _delay_ms(10);
-    }
-}
-
 
 int main(void) {
       /* Configure clock prescaler for 4MHz  */
@@ -481,8 +341,6 @@ int main(void) {
             CLKCTRL_PDIV_4X_gc /* Prescaler division: 4X */
             | CLKCTRL_PEN_bm /* Prescaler enable: enabled */
             );
-    
-    test_tensor_fns();
     
     /* Enable pullups for low power consumption (20uA -> 0.1uA (afair))*/
     PORTA.PIN0CTRL |= PORT_PULLUPEN_bm;
