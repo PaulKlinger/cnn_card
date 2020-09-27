@@ -72,6 +72,7 @@ void t4_add(
 
 
 void t4_relu(struct float_4tensor *t) {
+    /* apply relu function (elementwise maximum with 0) to 4tensor t */
     for (uint16_t i=0; i < t->s0 * t->s1 * t->s2 * t->s3; i++) {
         if (t->data[i] < 0) {
             t->data[i] = 0.0;
@@ -81,6 +82,7 @@ void t4_relu(struct float_4tensor *t) {
 
 
 float t4_max(struct float_4tensor *t) {
+    /* returns maximum entry in 4tensor t */
     float max = t->data[0];
     for (uint16_t i=1; i < t->s0 * t->s1 * t->s2 * t->s3; i++) {
         if (t->data[i] > max) {
@@ -159,7 +161,7 @@ void t4_max_pool(
      */
     
     for (uint8_t channel=0; channel < t->s2; channel++) {
-        float max = t4_get_value(t, 0, 0, channel, 0);
+        float max = -FLT_MAX;
         for (uint8_t row=0; row < t->s0; row++) {
             for (uint8_t col=0; col < t->s1; col++) {
                 float val = t4_get_value(t, row, col, channel, 0);
