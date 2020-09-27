@@ -1,4 +1,4 @@
-#define F_CPU 4000000
+#define F_CPU 10000000
 
 #include <avr/io.h>
 #include <util/delay.h>
@@ -15,7 +15,7 @@ FUSES =
 	.APPEND = 0,
 	.BODCFG = ACTIVE_DIS_gc | LVL_BODLEVEL0_gc | SAMPFREQ_1KHZ_gc | SLEEP_DIS_gc,
 	.BOOTEND = 0,
-	.OSCCFG = FREQSEL_16MHZ_gc,
+	.OSCCFG = FREQSEL_20MHZ_gc,
 	.SYSCFG0 = CRCSRC_NOCRC_gc | RSTPINCFG_UPDI_gc,
 	.SYSCFG1 = SUT_64MS_gc,
 	.WDTCFG = PERIOD_OFF_gc | WINDOW_OFF_gc,
@@ -338,7 +338,7 @@ int main(void) {
       /* Configure clock prescaler for 4MHz  */
     _PROTECTED_WRITE(
             CLKCTRL.MCLKCTRLB,
-            CLKCTRL_PDIV_4X_gc /* Prescaler division: 4X */
+            CLKCTRL_PDIV_2X_gc /* Prescaler division: 2X */
             | CLKCTRL_PEN_bm /* Prescaler enable: enabled */
             );
     
