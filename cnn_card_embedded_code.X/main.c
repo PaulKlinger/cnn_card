@@ -23,7 +23,7 @@ FUSES =
 
 
 /* precomputed bytes to shift out during main loop*/
-uint8_t row_shift_bytes[(PWM_LEVELS) * 9];
+uint8_t row_shift_bytes[PWM_LEVELS * 9];
 uint8_t col_shift_bytes[9];
 
 /* brightness of row8 leds (not controlled via shift register) */
@@ -49,7 +49,7 @@ void update_pwm_pattern() {
             if (row == 8) {
                 row8_brightness[col] = brightness;
             } else {
-                for (uint8_t pwm_index=0; pwm_index < (PWM_LEVELS); pwm_index++) {
+                for (uint8_t pwm_index=0; pwm_index < PWM_LEVELS; pwm_index++) {
                     if (pwm_index < brightness) {
                         row_shift_bytes[9 * pwm_index + col] &= ~(1 << (row % 8));
                     } else {
@@ -226,6 +226,7 @@ void read_buttons(){
         
         if (last_pressed == FILTER_BUTTON) {
             filter_idx = (filter_idx + 1) % N_FILTERS;
+            run_model_and_set_led_brightness(filter_idx);
             set_filter_leds();
         } else if (last_pressed == PWR_BUTTON) {
             go_to_sleep();
@@ -237,7 +238,7 @@ void read_buttons(){
                 (get_led_brightness(row, col) == 0) ? MAX_PWM_LEVEL : 0
             );
             
-            run_model_and_set_led_brightness();
+            run_model_and_set_led_brightness(filter_idx);
             update_pwm_pattern();
             
         }
@@ -260,7 +261,7 @@ void main_loop() {
     set_led_brightness(3, 2, MAX_PWM_LEVEL);
     set_led_brightness(3, 3, MAX_PWM_LEVEL);
     
-    run_model_and_set_led_brightness();
+    run_model_and_set_led_brightness(filter_idx);
     
     set_filter_leds();
     update_pwm_pattern();

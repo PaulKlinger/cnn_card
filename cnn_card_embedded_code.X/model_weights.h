@@ -14,10 +14,16 @@ extern "C" {
 
     struct float_4tensor conv0_kernel;
     struct float_4tensor conv0_bias;
+    const float conv0_activation_99per;
+    
     struct float_4tensor conv1_kernel;
     struct float_4tensor conv1_bias;
+    const float conv1_activation_99per;
+    
     struct float_4tensor conv2_kernel;
     struct float_4tensor conv2_bias;
+    const float conv2_activation_99per;
+    
     struct float_4tensor dense_kernel;
     struct float_4tensor dense_bias;
     

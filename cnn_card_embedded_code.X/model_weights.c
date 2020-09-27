@@ -1,6 +1,12 @@
 #include "tensor.h"
 
 
+
+const float conv0_activation_99per = 2.8690316677093506;
+const float conv1_activation_99per = 5.472453594207764;
+const float conv2_activation_99per = 9.902957916259766;
+
+
 const float conv0_kernel_data[] = {
     1.5657663 ,  0.88373774, -1.2657819 , -0.68050164,  1.3737351 ,
     -1.0296128 , -1.3210745 ,  0.36918926,  0.76399225,  1.5246062 ,
