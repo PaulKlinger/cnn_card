@@ -10,19 +10,12 @@
 #include <avr/io.h>
 
 
-uint8_t get_brightness(float activation_strength, float max) {
-    /* convert float in [0, 1] to pwm level */
-    // TODO: gamma correction
-    return round(activation_strength / max * MAX_PWM_LEVEL);
-}
-
-
 void set_output_led_brightness (
     struct float_4tensor *output
 ) {
-    set_led_brightness(8, 1, get_brightness(output->data[0], 1.0));
+    set_led_brightness(8, 1, value_to_pwm_level(output->data[0], 1.0));
     for (uint8_t i=0; i < output->s0 - 1; i++) {
-        set_led_brightness(7, i, get_brightness(output->data[i + 1], 1.0));
+        set_led_brightness(7, i, value_to_pwm_level(output->data[i + 1], 1.0));
     }
 }
 
@@ -40,12 +33,12 @@ void set_conv0_led_brightness (
     }
     for (uint8_t i=0; i < 15; i++) {
         set_led_brightness(i % 5, 5 + i / 5,
-            get_brightness(
+            value_to_pwm_level(
                 t4_get_value(conv0_out, i % 4, i / 4, filter_idx, 0),
                 conv0_activation_99per));
     }
     set_led_brightness(5, 0,
-            get_brightness(
+            value_to_pwm_level(
                 t4_get_value(conv0_out, 3, 3, filter_idx, 0),
                 conv0_activation_99per));
 }
@@ -65,16 +58,16 @@ void set_conv1_led_brightness (
     }
     for (uint8_t i=0; i < 7; i++) {
         set_led_brightness(5, i + 1,
-            get_brightness(
+            value_to_pwm_level(
                 t4_get_value(conv1_out, i % 3, i / 3, filter_idx, 0),
                 conv1_activation_99per));
     }
     set_led_brightness(0, 8,
-            get_brightness(
+            value_to_pwm_level(
                 t4_get_value(conv1_out, 1, 2, filter_idx, 0),
                 conv1_activation_99per));
     set_led_brightness(1, 8,
-            get_brightness(
+            value_to_pwm_level(
                 t4_get_value(conv1_out, 2, 2, filter_idx, 0),
                 conv1_activation_99per));
 }
@@ -86,7 +79,7 @@ void set_conv2_led_brightness (
 ) {
     for (uint8_t i=0; i < 4; i++) {
         set_led_brightness(2 + i, 8,
-            get_brightness(
+            value_to_pwm_level(
                 t4_get_value(conv2_out, i % 2, i / 2, filter_idx, 0),
                 conv2_activation_99per));
     }
@@ -98,18 +91,18 @@ void set_pool_led_brightness (
 ) {
     for (uint8_t i=0; i < 6; i++) {
         set_led_brightness(8, i + 3,
-            get_brightness(
+            value_to_pwm_level(
                 t4_get_value(pool_out, i, 0, 0, 0),
                 conv2_activation_99per));
     }
     for (uint8_t i=0; i < 9; i++) {
         set_led_brightness(6, i,
-            get_brightness(
+            value_to_pwm_level(
                 t4_get_value(pool_out, i + 6, 0, 0, 0),
                 conv2_activation_99per));
     }
     set_led_brightness(8, 2,
-        get_brightness(
+        value_to_pwm_level(
             t4_get_value(pool_out, 15, 0, 0, 0),
             conv2_activation_99per));
 }

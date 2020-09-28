@@ -17,7 +17,7 @@ extern "C" {
 #define AUTO_SHUTDOWN_TIME_s 60 * 2 // 2 min
 
 #define LED_COUNT 5 * 5 + 4 * 4 + 3 * 3 + 2 * 2 + 16 + 10 + 4
-#define PWM_BITS 5
+#define PWM_BITS 6 /* NEED TO CHANGE gamma_table in led_status.c if this changes! */
 #define N_FILTERS 16
 
 
