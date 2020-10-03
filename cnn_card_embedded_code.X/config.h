@@ -11,6 +11,8 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+    
+#define F_CPU 10000000
 
 // config options
 #define DEBOUNCE_THRESHOLD 5

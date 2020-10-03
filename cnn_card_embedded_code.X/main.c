@@ -1,4 +1,6 @@
-#define F_CPU 10000000
+
+
+#include "config.h"
 
 #include <avr/io.h>
 #include <util/delay.h>
@@ -6,8 +8,7 @@
 #include <avr/interrupt.h>
 
 #include "model.h"
-#include "config.h"
-#include "led_status.h"
+#include "led_control.h"
 
 
 FUSES = 
@@ -22,44 +23,9 @@ FUSES =
 };
 
 
-/* precomputed bytes to shift out during main loop*/
-uint8_t row_shift_bytes[PWM_LEVELS * 9];
-uint8_t col_shift_bytes[9];
-
-/* brightness of row8 leds (not controlled via shift register) */
-uint8_t row8_brightness[9];
-
 uint8_t filter_idx = 0;
 
 
-void init_col_shift_bytes() {
-    // set column select shift pattern for first 8 cols
-    // don't compute this dynamically to make pwm cycles more even
-    for (uint8_t col=0; col < 8; col++) {
-        col_shift_bytes[col] = (1 << col);
-    }
-    col_shift_bytes[8] = 0;
-}
-
-
-void update_pwm_pattern() {
-    for (uint8_t row=0; row <= 8; row++) {
-        for (uint8_t col=0; col <= 8; col++) {
-            uint8_t brightness = get_led_brightness(row, col);
-            if (row == 8) {
-                row8_brightness[col] = brightness;
-            } else {
-                for (uint8_t pwm_index=0; pwm_index < PWM_LEVELS; pwm_index++) {
-                    if (pwm_index < brightness) {
-                        row_shift_bytes[9 * pwm_index + col] &= ~(1 << (row % 8));
-                    } else {
-                        row_shift_bytes[9 * pwm_index + col] |= (1 << (row % 8));
-                    }
-                }
-            }
-        }
-    }
-}
 
 
 ISR(PORTB_PORT_vect) {
@@ -95,23 +61,6 @@ void usart_spi_init(){
     USART0.BAUDL = (1 << 6);
 }
 
-
-void turn_off_leds() {
-    /* shift out pattern for all leds off*/
-    /* wait for tx buffer ready*/
-    while (!(USART0.STATUS & USART_DREIF_bm)){}
-    USART0.TXDATAL = 0;
-    while (!(USART0.STATUS & USART_DREIF_bm)){}
-    USART0.TXDATAL = 255;
-    
-    /* turn off GPIO controlled row/col 8 */
-    VPORTC.OUT |= PIN5_bm;
-    VPORTC.OUT &= ~PIN4_bm;
-    
-    /* turn off individual leds 
-     * (change to input to remember value) */
-    VPORTB.DIR &= ~(PIN4_bm | PIN5_bm | PIN6_bm);
-}
 
 void reset_rtc_cnt() {
     /* reset RTC (auto shutdown counter) */
@@ -265,63 +214,11 @@ void main_loop() {
     
     set_filter_leds();
     update_pwm_pattern();
-    init_col_shift_bytes();
+    init_pwm_data();
     
     
     while (1) {
-        uint8_t set_vportc = VPORTC.OUT;
-        uint8_t next_vportc = VPORTC.OUT;
-        for (uint8_t pwm_idx=0; pwm_idx < PWM_LEVELS; pwm_idx++) {
-            for (uint8_t col=0; col <= 8; col++){
-                /* set column */
-                if (col == 8) {
-                    next_vportc = VPORTC.OUT | PIN4_bm;
-                } else {
-                    next_vportc = VPORTC.OUT & ~PIN4_bm;
-                }
-
-               /* set row8 */
-                if (pwm_idx < row8_brightness[col]) {
-                    next_vportc &= ~PIN5_bm;
-                } else {
-                    next_vportc |= PIN5_bm;
-                }
-                
-                /* shift register output disable */
-                VPORTC.OUT |= PIN2_bm;
-                /* turn off row8, this ensures that led (8,8) isn't brighter
-                 * (it would be on during the wait loop below) */
-                VPORTC.OUT |= PIN5_bm;
-                
-                /* wait for shift out to complete 
-                 * (RCK will be pulsed automatically) */
-                /* TODO: replacing this with _delay_us(1) improves speed
-                 * significantly, but then col 7 is active longer */
-                while (!(USART0.STATUS & USART_TXCIF_bm)) {}
-                
-                // need to clear transmit complete flag manually
-                USART0.STATUS |= USART_TXCIF_bm;
-                
-                /* set col8 / row8 and enable shift register output */
-                VPORTC.OUT = set_vportc;
-                
-                
-                USART0.TXDATAL = col_shift_bytes[col];
-                while (!(USART0.STATUS & USART_DREIF_bm)){}
-                USART0.TXDATAL = row_shift_bytes[9 * pwm_idx + col];
-                
-                set_vportc = next_vportc;
-            }
-        }
-        // pulse SCK & set portc for last iteration  
-        _delay_us(4);
-        VPORTC.OUT = set_vportc;
-        _delay_us(8);
-        
-        
-        // turn off leds (otherwise last col is brighter
-        // because of button scan time)
-        turn_off_leds();
+        run_pwm_cycle();
         if (RTC.CNT > AUTO_SHUTDOWN_TIME_s) {
             turn_off_leds();
             go_to_sleep();

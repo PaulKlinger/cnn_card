@@ -24,6 +24,15 @@ void set_led_brightness(uint8_t row, uint8_t col, uint8_t val);
 
 uint8_t value_to_pwm_level(float value, float max_value);
 
+void init_pwm_data();
+
+void update_pwm_pattern();
+
+void turn_off_leds();
+
+void run_pwm_cycle();
+
+
 #ifdef	__cplusplus
 }
 #endif

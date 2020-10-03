@@ -3,7 +3,7 @@
 #include "model_weights.h"
 #include "tensor.h"
 #include "config.h"
-#include "led_status.h"
+#include "led_control.h"
 
 #include <math.h>
 
@@ -173,10 +173,7 @@ void run_model_and_set_led_brightness(uint8_t filter_idx) {
                          !!get_led_brightness(row, col));
         }
     }
-    
-    
-    VPORTB.DIR |= PIN6_bm;
-    PORTB.OUT &= ~PIN6_bm;
+
     t4_convolve_2x2(&t_in, &conv0_kernel, &conv0_out);
     t4_add_conv_bias(&conv0_out, &conv0_bias);
     t4_relu(&conv0_out);
@@ -204,8 +201,6 @@ void run_model_and_set_led_brightness(uint8_t filter_idx) {
     t4_add(&t_out, &dense_bias);
     t4_softmax(&t_out);
     
-    
-    PORTB.OUT |= PIN6_bm;
     
     set_output_led_brightness(&t_out);
 }
