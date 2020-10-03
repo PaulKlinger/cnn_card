@@ -34,6 +34,13 @@ ISR(PORTB_PORT_vect) {
     VPORTB.INTFLAGS |= PORT_INT3_bm;
 }
 
+ISR(RTC_PIT_vect)
+{
+    run_pwm_cycle();
+    /* TRIGB interrupt flag has to be cleared manually */
+    RTC.PITINTFLAGS = RTC_PI_bm;
+}
+
 
 void rtc0_init(){
     while (RTC.STATUS > 0) { /* Wait for all register to be synchronized */}
@@ -46,6 +53,14 @@ void rtc0_init(){
     RTC.CTRLA = RTC_PRESCALER_DIV32768_gc/* Prescaling Factor: RTC Clock / 32768 */
                 | 1 << RTC_RTCEN_bp /* Enable: enabled */
                 | 0 << RTC_RUNSTDBY_bp; /* Run In Standby: disabled */
+    
+    while (RTC.PITSTATUS > 0) {}
+    /* set PIT period (for PWM during calculations) but don't enable it
+     * most of the time we'll just run PWM in main loop so it's faster.
+     */
+    RTC.PITINTCTRL = RTC_PI_bm;
+    RTC.PITCTRLA = RTC_PERIOD_CYC512_gc; // = 64 Hz
+
 }
 
 
@@ -103,6 +118,16 @@ void set_filter_leds() {
     else {set_led_brightness(8, 0, 0);}
     
     update_pwm_pattern();
+}
+
+void run_model_with_pwm() {
+    // enable interrupt pwm during model calculations
+    RTC.PITCTRLA |= RTC_PITEN_bm;
+
+    run_model_and_set_led_brightness(filter_idx);
+
+    // disable interrupt pwm again
+    RTC.PITCTRLA &= ~RTC_PITEN_bm;
 }
 
 
@@ -175,7 +200,7 @@ void read_buttons(){
         
         if (last_pressed == FILTER_BUTTON) {
             filter_idx = (filter_idx + 1) % N_FILTERS;
-            run_model_and_set_led_brightness(filter_idx);
+            run_model_with_pwm();
             set_filter_leds();
         } else if (last_pressed == PWR_BUTTON) {
             go_to_sleep();
@@ -187,7 +212,7 @@ void read_buttons(){
                 (get_led_brightness(row, col) == 0) ? MAX_PWM_LEVEL : 0
             );
             
-            run_model_and_set_led_brightness(filter_idx);
+            run_model_with_pwm();
             update_pwm_pattern();
             
         }
