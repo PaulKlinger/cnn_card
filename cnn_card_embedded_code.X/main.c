@@ -123,10 +123,10 @@ void reset_input_state() {
     set_led_brightness(3, 2, MAX_PWM_LEVEL);
     set_led_brightness(3, 3, MAX_PWM_LEVEL);
     
+    set_filter_leds();
     update_pwm_pattern();
     
     run_model_with_pwm();
-    set_filter_leds();
     update_pwm_pattern();
 }
 
@@ -143,6 +143,8 @@ void go_to_sleep() {
     sleep_enable();
     sleep_cpu();
     turn_off_leds();
+    // turn off individual leds
+    VPORTB.OUT |= (PIN4_bm | PIN5_bm | PIN6_bm);
     while (~PORTB.IN & PIN3_bm) {}
     _delay_ms(50);
     reset_rtc_cnt();
