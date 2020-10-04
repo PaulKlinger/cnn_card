@@ -18,6 +18,8 @@ extern "C" {
 /* 3-bit brightness values for each led*/
 uint8_t led_status[LED_COUNT * PWM_BITS / 8 + 1];
 
+void clear_led_brightness();
+
 uint8_t get_led_brightness(uint8_t row, uint8_t col);
 
 void set_led_brightness(uint8_t row, uint8_t col, uint8_t val);

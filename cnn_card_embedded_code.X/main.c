@@ -9,6 +9,7 @@
 
 #include "model.h"
 #include "led_control.h"
+#include "startup_anim.h"
 
 
 FUSES = 
@@ -26,8 +27,6 @@ FUSES =
 uint8_t filter_idx = 0;
 
 
-
-
 ISR(PORTB_PORT_vect) {
     /* This is only used to wake the MCU, so we do nothing here. */
     /* clear interrupt flag */
@@ -36,6 +35,7 @@ ISR(PORTB_PORT_vect) {
 
 ISR(RTC_PIT_vect)
 {
+    /* interrupt triggered pwm, only used when the main loop is busy */
     run_pwm_cycle();
     /* TRIGB interrupt flag has to be cleared manually */
     RTC.PITINTFLAGS = RTC_PI_bm;
@@ -86,21 +86,15 @@ void reset_rtc_cnt() {
     RTC.CNT = 0;
 }
 
-void go_to_sleep() {
-    /* Go to sleep, wakeup on PWR button press
-     * unfortunately synchronous pins like PB3 can only wake the chip
-     * with BOTHEDGES or LEVEL interrupts, so we have to wait until the
-     * button is released (and no longer bouncing) before going to sleep.
-     */
-    while (~PORTB.IN & PIN3_bm) {}
-    _delay_ms(50);
-    set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-    sleep_enable();
-    sleep_cpu();
-    while (~PORTB.IN & PIN3_bm) {}
-    _delay_ms(50);
-    
-    reset_rtc_cnt();
+
+void run_model_with_pwm() {
+    // enable interrupt pwm during model calculations
+    RTC.PITCTRLA |= RTC_PITEN_bm;
+
+    run_model_and_set_led_brightness(filter_idx);
+
+    // disable interrupt pwm again
+    RTC.PITCTRLA &= ~RTC_PITEN_bm;
 }
 
 
@@ -116,18 +110,45 @@ void set_filter_leds() {
     
     if (filter_idx & (1 << 3)) {set_led_brightness(8, 0, MAX_PWM_LEVEL);}
     else {set_led_brightness(8, 0, 0);}
+}
+
+
+void reset_input_state() {
+    filter_idx = 0;
+    clear_led_brightness();
+    set_led_brightness(1, 1, MAX_PWM_LEVEL);
+    set_led_brightness(1, 2, MAX_PWM_LEVEL);
+    set_led_brightness(2, 2, MAX_PWM_LEVEL);
+    set_led_brightness(3, 1, MAX_PWM_LEVEL);
+    set_led_brightness(3, 2, MAX_PWM_LEVEL);
+    set_led_brightness(3, 3, MAX_PWM_LEVEL);
     
+    update_pwm_pattern();
+    
+    run_model_with_pwm();
+    set_filter_leds();
     update_pwm_pattern();
 }
 
-void run_model_with_pwm() {
-    // enable interrupt pwm during model calculations
-    RTC.PITCTRLA |= RTC_PITEN_bm;
 
-    run_model_and_set_led_brightness(filter_idx);
-
-    // disable interrupt pwm again
-    RTC.PITCTRLA &= ~RTC_PITEN_bm;
+void go_to_sleep() {
+    /* Go to sleep, wakeup on PWR button press
+     * unfortunately synchronous pins like PB3 can only wake the chip
+     * with BOTHEDGES or LEVEL interrupts, so we have to wait until the
+     * button is released (and no longer bouncing) before going to sleep.
+     */
+    while (~PORTB.IN & PIN3_bm) {}
+    _delay_ms(50);
+    set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+    sleep_enable();
+    sleep_cpu();
+    turn_off_leds();
+    while (~PORTB.IN & PIN3_bm) {}
+    _delay_ms(50);
+    reset_rtc_cnt();
+    
+    run_startup_animation();
+    reset_input_state();
 }
 
 
@@ -202,6 +223,7 @@ void read_buttons(){
             filter_idx = (filter_idx + 1) % N_FILTERS;
             run_model_with_pwm();
             set_filter_leds();
+            update_pwm_pattern();
         } else if (last_pressed == PWR_BUTTON) {
             go_to_sleep();
         } else {
@@ -222,26 +244,6 @@ void read_buttons(){
 
 void main_loop() {
     
-    for (uint8_t row=0; row < 9; row++) {
-        for (uint8_t col=0; col < 9; col++) {
-            set_led_brightness(row, col, 0);
-        }
-    }
-    
-    set_led_brightness(1, 1, MAX_PWM_LEVEL);
-    set_led_brightness(1, 2, MAX_PWM_LEVEL);
-    set_led_brightness(2, 2, MAX_PWM_LEVEL);
-    set_led_brightness(3, 1, MAX_PWM_LEVEL);
-    set_led_brightness(3, 2, MAX_PWM_LEVEL);
-    set_led_brightness(3, 3, MAX_PWM_LEVEL);
-    
-    run_model_and_set_led_brightness(filter_idx);
-    
-    set_filter_leds();
-    update_pwm_pattern();
-    init_pwm_data();
-    
-    
     while (1) {
         run_pwm_cycle();
         if (RTC.CNT > AUTO_SHUTDOWN_TIME_s) {
@@ -250,9 +252,6 @@ void main_loop() {
         }
         
         read_buttons();
-        
-        // turn on single leds
-        VPORTB.DIR |= (PIN4_bm | PIN5_bm | PIN6_bm);
     }
 }
 
@@ -304,11 +303,6 @@ int main(void) {
     
     rtc0_init();
     
-    //sei();
-    //while (1) {
-    
-    //}
-    
     usart_spi_init();
     
     // shift register output disable
@@ -317,18 +311,24 @@ int main(void) {
     VPORTC.OUT &= ~PIN4_bm;
     VPORTC.OUT |= PIN5_bm;
     
+    // turn off individual leds
+    VPORTB.OUT |= (PIN4_bm | PIN5_bm | PIN6_bm);
+    
     VPORTB.DIR = (PIN0_bm | PIN1_bm | PIN2_bm | PIN4_bm | PIN5_bm | PIN6_bm);
     VPORTC.DIR |= (PIN2_bm | PIN4_bm | PIN5_bm);
+    
+
     
     
     turn_off_leds();
     
-    // sleep
-    go_to_sleep();
-    
     /* shift register output enable */
     VPORTC.OUT &= ~PIN2_bm;
     
+    init_pwm_data();
+    
+    // sleep
+    go_to_sleep();
     
     main_loop();
     

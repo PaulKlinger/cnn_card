@@ -37,6 +37,13 @@ uint8_t value_to_pwm_level(float value, float max_value) {
 }
 
 
+void clear_led_brightness() {
+    for (uint16_t i=0; i < sizeof(led_status); i++) {
+        led_status[i] = 0;
+    }
+}
+
+
 uint8_t get_led_brightness(uint8_t row, uint8_t col) {
     uint16_t start_idx = (row * 9 + col) * PWM_BITS;
     uint8_t out = 0;
@@ -111,6 +118,9 @@ void turn_off_leds() {
 
 void run_pwm_cycle() {
     /* Run a full PWM cycle: PWM_LEVELS * 9 columns different output states */
+    
+    // turn on single leds
+    VPORTB.DIR |= (PIN4_bm | PIN5_bm | PIN6_bm);
     uint8_t set_vportc = VPORTC.OUT;
     uint8_t next_vportc = VPORTC.OUT;
     for (uint8_t pwm_idx=0; pwm_idx < PWM_LEVELS; pwm_idx++) {
