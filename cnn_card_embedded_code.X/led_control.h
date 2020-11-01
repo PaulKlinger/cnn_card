@@ -9,18 +9,24 @@
 #define	LED_STATUS_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "config.h"
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
+    
+    
+#define LED_STATUS_BYTES LED_COUNT * PWM_BITS / 8 + 1
 
-/* 3-bit brightness values for each led*/
-uint8_t led_status[LED_COUNT * PWM_BITS / 8 + 1];
+/* PWM_BITS bit brightness values for each led*/
+uint8_t led_status[LED_STATUS_BYTES];
 
 void clear_led_brightness();
 
 uint8_t get_led_brightness(uint8_t row, uint8_t col);
+
+bool get_led_on(uint8_t row, uint8_t col);
 
 void set_led_brightness(uint8_t row, uint8_t col, uint8_t val);
 

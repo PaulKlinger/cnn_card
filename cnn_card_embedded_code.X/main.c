@@ -10,6 +10,7 @@
 #include "model.h"
 #include "led_control.h"
 #include "startup_anim.h"
+#include "gol.h"
 
 
 FUSES = 
@@ -222,6 +223,16 @@ void read_buttons(){
         debounce_counter = HELD_FLAG;
         
         if (last_pressed == FILTER_BUTTON) {
+            if (check_glider()) {
+                RTC.PITCTRLA |= RTC_PITEN_bm;
+                while (1) {
+                    filter_idx = (filter_idx + 1) % N_FILTERS;
+                    set_filter_leds();
+                    update_pwm_pattern();
+                    _delay_ms(100);
+                }
+                
+            }
             filter_idx = (filter_idx + 1) % N_FILTERS;
             run_model_with_pwm();
             set_filter_leds();

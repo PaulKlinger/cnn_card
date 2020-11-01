@@ -10,6 +10,7 @@
       <itemPath>config.h</itemPath>
       <itemPath>led_control.h</itemPath>
       <itemPath>startup_anim.h</itemPath>
+      <itemPath>gol.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LinkerScript"
                    displayName="Linker Files"
@@ -30,6 +31,7 @@
                    projectFiles="false">
       <itemPath>Makefile</itemPath>
     </logicalFolder>
+    <itemPath>gol.c</itemPath>
   </logicalFolder>
   <projectmakefile>Makefile</projectmakefile>
   <confs>

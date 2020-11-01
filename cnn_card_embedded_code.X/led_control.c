@@ -3,10 +3,11 @@
 #include <stdint.h>
 #include <avr/io.h>
 #include <util/delay.h>
+#include <stdbool.h>
 
 
 /* PWM_BITS-bit brightness values for each led*/
-uint8_t led_status[LED_COUNT * PWM_BITS / 8 + 1] = {0};
+uint8_t led_status[LED_STATUS_BYTES] = {0};
 
 
 /* precomputed bytes to shift out during main loop*/
@@ -53,6 +54,11 @@ uint8_t get_led_brightness(uint8_t row, uint8_t col) {
     }
     
     return out;
+}
+
+bool get_led_on(uint8_t row, uint8_t col) {
+    uint16_t start_idx = (row * 9 + col) * PWM_BITS;
+    return led_status[(start_idx) / 8] & (1 << (start_idx % 8));
 }
 
 
