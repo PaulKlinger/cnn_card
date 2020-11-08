@@ -22,11 +22,7 @@ extern "C" {
 #define PWM_BITS 6 /* NEED TO CHANGE gamma_table in led_status.c if this changes! */
 #define N_FILTERS 16
 
-
-// flag values
-#define HELD_FLAG 100
-#define FILTER_BUTTON 25
-#define PWR_BUTTON 26
+    
 #define PWM_LEVELS (1 << PWM_BITS)
 #define MAX_PWM_LEVEL (PWM_LEVELS - 1)
 

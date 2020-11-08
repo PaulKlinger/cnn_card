@@ -11,6 +11,8 @@
       <itemPath>led_control.h</itemPath>
       <itemPath>startup_anim.h</itemPath>
       <itemPath>gol.h</itemPath>
+      <itemPath>buttons.h</itemPath>
+      <itemPath>sleep.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LinkerScript"
                    displayName="Linker Files"
@@ -25,13 +27,15 @@
       <itemPath>model.c</itemPath>
       <itemPath>led_control.c</itemPath>
       <itemPath>startup_anim.c</itemPath>
+      <itemPath>gol.c</itemPath>
+      <itemPath>buttons.c</itemPath>
+      <itemPath>sleep.c</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"
                    projectFiles="false">
       <itemPath>Makefile</itemPath>
     </logicalFolder>
-    <itemPath>gol.c</itemPath>
   </logicalFolder>
   <projectmakefile>Makefile</projectmakefile>
   <confs>
@@ -201,6 +205,8 @@
         <property key="memories.programmemory" value="true"/>
         <property key="memories.programmemory.ranges" value="0-3fff"/>
         <property key="poweroptions.powerenable" value="false"/>
+        <property key="programmerToGoFilePath"
+                  value="C:/Users/kling/Insync/klinger.paul@gmail.com/Google Drive/hardware/cnn_card/cnn_card_embedded_code.X/debug/default/cnn_card_embedded_code_ptg"/>
         <property key="programmerToGoImageName" value="cnn_card_embedded_code_ptg"/>
         <property key="programoptions.donoteraseauxmem" value="false"/>
         <property key="programoptions.eraseb4program" value="true"/>
@@ -398,6 +404,8 @@
         <property key="memories.programmemory" value="true"/>
         <property key="memories.programmemory.ranges" value="0-3fff"/>
         <property key="poweroptions.powerenable" value="false"/>
+        <property key="programmerToGoFilePath"
+                  value="C:/Users/kling/Insync/klinger.paul@gmail.com/Google Drive/hardware/cnn_card/cnn_card_embedded_code.X/debug/debug/cnn_card_embedded_code_ptg"/>
         <property key="programmerToGoImageName" value="cnn_card_embedded_code_ptg"/>
         <property key="programoptions.donoteraseauxmem" value="false"/>
         <property key="programoptions.eraseb4program" value="true"/>
