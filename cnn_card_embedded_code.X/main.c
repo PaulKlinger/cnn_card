@@ -147,7 +147,7 @@ void handle_buttons(){
         uint8_t col = pressed % 5;
 
         set_led_brightness(row, col,
-            (get_led_brightness(row, col) == 0) ? MAX_PWM_LEVEL : 0
+            get_led_on(row, col) ? 0 : MAX_PWM_LEVEL
         );
 
         run_model_with_pwm();
