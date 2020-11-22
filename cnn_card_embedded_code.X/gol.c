@@ -2,6 +2,7 @@
 #include "led_control.h"
 #include "config.h"
 #include "buttons.h"
+#include "sleep.h"
 
 #include <util/delay.h>
 #include <stdbool.h>
@@ -96,6 +97,11 @@ void run_gol() {
     bool odd_step = true;
     
     while (1) {
+        if (RTC.CNT > AUTO_SHUTDOWN_TIME_s) {
+            turn_off_leds();
+            go_to_sleep();
+            return;
+        }
         if (running) {
             do_gol_step();
             
@@ -113,6 +119,11 @@ void run_gol() {
         for (uint8_t i=0; i < 60; i++) {
             run_pwm_cycle();
             int8_t pressed = read_buttons();
+            if (pressed != -1) {
+                // reset auto shutdown timer
+                reset_rtc_cnt();
+            }
+            
             if (pressed == PWR_BUTTON) {
                 return;
             } else if (pressed == FILTER_BUTTON) {
