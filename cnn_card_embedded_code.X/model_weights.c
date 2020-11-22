@@ -264,15 +264,15 @@ const struct float_4tensor conv2_bias = {
 
 const struct float_4tensor dense_kernel = {
     .data=(float*) dense_kernel_data,
-    .s0=10, // input channels
-    .s1=16, // units
+    .s0=10, // units
+    .s1=16, // input channels
     .s2=1,
     .s3=1
 };
 
 const struct float_4tensor dense_bias = {
     .data=(float*) dense_bias_data,
-    .s0=10, // channels
+    .s0=10, // units
     .s1=1,
     .s2=1,
     .s3=1 
