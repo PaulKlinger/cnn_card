@@ -10,7 +10,6 @@
 
 
 bool check_glider() {
-    bool match = true;
     bool led_on;
     for (uint8_t row=0; row < 5; row++) {
         for (uint8_t col=0; col < 5; col++) {
@@ -19,16 +18,16 @@ bool check_glider() {
                 (row == 2 && col == 1) ||
                 (row == 3 && col > 0 && col < 4)) {
                 if (!led_on) {
-                    match = false;
+                    return false;
                 }
             } else {
                 if (led_on) {
-                    match = false;
+                    return false;
                 }
             }
         }
     }
-    return match;
+    return true;
 }
 
 static inline int8_t modulo(int8_t a, int8_t b){
