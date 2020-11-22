@@ -25,6 +25,8 @@ The aux_code directory contains some auxiliary notebooks: One to generate the st
 ## Electronics
 PCB design (gerbers and Eagle/Fusion sources) in the [pcb folder](https://github.com/PaulKlinger/cnn_card/tree/master/pcb).
 
+Schematic [here](https://github.com/PaulKlinger/cnn_card/blob/master/pcb/schematic.pdf).
+
 List of components (bill of materials) [here](https://github.com/PaulKlinger/cnn_card/blob/master/pcb/bom.csv).
 
 I had the PCB made by elecrow.com, 1mm thickness, ENIG, matte black soldermask. I also ordered a stencil from them and used hot air & paste to solder everything (except for the battery/holder, that was done manually).
