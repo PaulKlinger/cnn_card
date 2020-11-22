@@ -23,9 +23,9 @@ The aux_code directory contains some auxiliary notebooks: One to generate the st
 
 
 ## Electronics
-PCB design (gerbers and Eagle/Fusion sources) in the `pcb` folder.
+PCB design (gerbers and Eagle/Fusion sources) in the [pcb folder](https://github.com/PaulKlinger/cnn_card/tree/master/pcb).
 
-Components (bill of materials) [here](https://github.com/PaulKlinger/cnn_card/blob/master/bom.csv).
+List of components (bill of materials) [here](https://github.com/PaulKlinger/cnn_card/blob/master/bom.csv).
 
 I had the PCB made by elecrow.com, 1mm thickness, ENIG, matte black soldermask. I also ordered a stencil from them and used hot air & paste to solder everything (except for the battery/holder, that was done manually).
 
@@ -33,4 +33,4 @@ For testing I used the coin cell battery holder listed in the BOM, and then repl
 
 The battery should last basically forever (decades) in standby (0.14 µA) and > 10 hours during use (it draws less than 10mA at maximum (max brightness on all leds) but probably closer to 2-3mA in normal use). After 2min of no input it automatically goes into standby mode.
 
-I found that using white LEDs works best (in terms of max brightness), even though the forward voltage looks like it should be too high. At the low currents here (<0.1 mA averaged, <1mA momentarily due to the multiplexing) the forward voltage isn't a problem and white LEDs are just much more efficient. Also, the phosphor means that the light is more diffuse which looks nicer.
+I found that using white LEDs works best (in terms of max brightness), even though the forward voltage looks like it should be too high for the CR2032. At the low currents here (<0.1 mA averaged per led, <1mA momentarily due to the multiplexing) the forward voltage isn't a problem and white LEDs are just much more efficient. Also, the phosphor means that the light is more diffuse which looks nicer.
