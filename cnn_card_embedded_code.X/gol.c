@@ -118,10 +118,6 @@ void run_gol() {
         for (uint8_t i=0; i < 60; i++) {
             run_pwm_cycle();
             int8_t pressed = read_buttons();
-            if (pressed != -1) {
-                // reset auto shutdown timer
-                reset_rtc_cnt();
-            }
             
             if (pressed == PWR_BUTTON) {
                 return;
