@@ -1,8 +1,8 @@
 #include "gol.h"
-#include "led_control.h"
-#include "config.h"
-#include "buttons.h"
-#include "sleep.h"
+#include "../util/led_control.h"
+#include "../config.h"
+#include "../util/buttons.h"
+#include "../util/sleep.h"
 
 #include <util/delay.h>
 #include <stdbool.h>
@@ -98,7 +98,6 @@ void run_gol() {
     while (1) {
         if (RTC.CNT > AUTO_SHUTDOWN_TIME_s) {
             turn_off_leds();
-            go_to_sleep();
             return;
         }
         if (running) {

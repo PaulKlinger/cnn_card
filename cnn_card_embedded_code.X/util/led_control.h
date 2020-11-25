@@ -10,7 +10,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "config.h"
+#include "../config.h"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -31,6 +31,8 @@ bool get_led_on(uint8_t row, uint8_t col);
 void set_led_brightness(uint8_t row, uint8_t col, uint8_t val);
 
 uint8_t value_to_pwm_level(float value, float max_value);
+
+void set_filter_leds(uint8_t filter_idx);
 
 void init_pwm_data();
 

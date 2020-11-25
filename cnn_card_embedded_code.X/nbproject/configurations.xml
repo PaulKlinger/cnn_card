@@ -4,15 +4,15 @@
     <logicalFolder name="HeaderFiles"
                    displayName="Header Files"
                    projectFiles="true">
-      <itemPath>tensor.h</itemPath>
-      <itemPath>model_weights.h</itemPath>
-      <itemPath>model.h</itemPath>
       <itemPath>config.h</itemPath>
-      <itemPath>led_control.h</itemPath>
-      <itemPath>startup_anim.h</itemPath>
-      <itemPath>gol.h</itemPath>
-      <itemPath>buttons.h</itemPath>
-      <itemPath>sleep.h</itemPath>
+      <itemPath>model/model.h</itemPath>
+      <itemPath>model/model_weights.h</itemPath>
+      <itemPath>model/tensor.h</itemPath>
+      <itemPath>util/buttons.h</itemPath>
+      <itemPath>util/led_control.h</itemPath>
+      <itemPath>util/sleep.h</itemPath>
+      <itemPath>fun/gol.h</itemPath>
+      <itemPath>fun/startup_anim.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LinkerScript"
                    displayName="Linker Files"
@@ -22,14 +22,14 @@
                    displayName="Source Files"
                    projectFiles="true">
       <itemPath>main.c</itemPath>
-      <itemPath>tensor.c</itemPath>
-      <itemPath>model_weights.c</itemPath>
-      <itemPath>model.c</itemPath>
-      <itemPath>led_control.c</itemPath>
-      <itemPath>startup_anim.c</itemPath>
-      <itemPath>gol.c</itemPath>
-      <itemPath>buttons.c</itemPath>
-      <itemPath>sleep.c</itemPath>
+      <itemPath>model/model.c</itemPath>
+      <itemPath>model/model_weights.c</itemPath>
+      <itemPath>model/tensor.c</itemPath>
+      <itemPath>util/buttons.c</itemPath>
+      <itemPath>util/led_control.c</itemPath>
+      <itemPath>util/sleep.c</itemPath>
+      <itemPath>fun/gol.c</itemPath>
+      <itemPath>fun/startup_anim.c</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"
@@ -205,8 +205,6 @@
         <property key="memories.programmemory" value="true"/>
         <property key="memories.programmemory.ranges" value="0-3fff"/>
         <property key="poweroptions.powerenable" value="false"/>
-        <property key="programmerToGoFilePath"
-                  value="C:/Users/kling/Insync/klinger.paul@gmail.com/Google Drive/hardware/cnn_card/cnn_card_embedded_code.X/debug/default/cnn_card_embedded_code_ptg"/>
         <property key="programmerToGoImageName" value="cnn_card_embedded_code_ptg"/>
         <property key="programoptions.donoteraseauxmem" value="false"/>
         <property key="programoptions.eraseb4program" value="true"/>
@@ -244,7 +242,7 @@
         <targetDevice>ATtiny3217</targetDevice>
         <targetHeader></targetHeader>
         <targetPluginBoard></targetPluginBoard>
-        <platformTool>pk4hybrid</platformTool>
+        <platformTool></platformTool>
         <languageToolchain>AVR</languageToolchain>
         <languageToolchainVersion>5.4.0</languageToolchainVersion>
         <platform>3</platform>
@@ -331,7 +329,7 @@
         <property key="make-warnings-into-errors" value="false"/>
         <property key="no-interrupts" value="false"/>
         <property key="no-system-directories" value="false"/>
-        <property key="optimization-level" value="-O0"/>
+        <property key="optimization-level" value="-O2"/>
         <property key="pack-struct" value="true"/>
         <property key="preprocessor-macros" value=""/>
         <property key="preprocessor-macros-undefined" value=""/>
@@ -404,8 +402,6 @@
         <property key="memories.programmemory" value="true"/>
         <property key="memories.programmemory.ranges" value="0-3fff"/>
         <property key="poweroptions.powerenable" value="false"/>
-        <property key="programmerToGoFilePath"
-                  value="C:/Users/kling/Insync/klinger.paul@gmail.com/Google Drive/hardware/cnn_card/cnn_card_embedded_code.X/debug/debug/cnn_card_embedded_code_ptg"/>
         <property key="programmerToGoImageName" value="cnn_card_embedded_code_ptg"/>
         <property key="programoptions.donoteraseauxmem" value="false"/>
         <property key="programoptions.eraseb4program" value="true"/>

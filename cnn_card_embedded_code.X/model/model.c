@@ -2,11 +2,10 @@
 
 #include "model_weights.h"
 #include "tensor.h"
-#include "config.h"
-#include "led_control.h"
+#include "../config.h"
+#include "../util/led_control.h"
 
 #include <math.h>
-
 #include <avr/io.h>
 
 

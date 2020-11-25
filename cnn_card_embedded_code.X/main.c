@@ -7,12 +7,12 @@
 #include <avr/sleep.h>
 #include <avr/interrupt.h>
 
-#include "model.h"
-#include "led_control.h"
-#include "buttons.h"
-#include "startup_anim.h"
-#include "gol.h"
-#include "sleep.h"
+#include "model/model.h"
+#include "util/led_control.h"
+#include "util/buttons.h"
+#include "util/sleep.h"
+#include "fun/startup_anim.h"
+#include "fun/gol.h"
 
 
 FUSES = 
@@ -91,21 +91,6 @@ void run_model_with_pwm() {
 }
 
 
-void set_filter_leds() {
-    if (filter_idx & 1) {PORTB.OUT &= ~PIN6_bm;}
-    else {PORTB.OUT |= PIN6_bm;}
-    
-    if (filter_idx & (1 << 1)) {PORTB.OUT &= ~PIN4_bm;}
-    else {PORTB.OUT |= PIN4_bm;}
-    
-    if (filter_idx & (1 << 2)) {PORTB.OUT &= ~PIN5_bm;}
-    else {PORTB.OUT |= PIN5_bm;}
-    
-    if (filter_idx & (1 << 3)) {set_led_brightness(8, 0, MAX_PWM_LEVEL);}
-    else {set_led_brightness(8, 0, 0);}
-}
-
-
 void reset_input_state() {
     filter_idx = 0;
     clear_led_brightness();
@@ -116,7 +101,7 @@ void reset_input_state() {
     set_led_brightness(3, 2, MAX_PWM_LEVEL);
     set_led_brightness(3, 3, MAX_PWM_LEVEL);
     
-    set_filter_leds();
+    set_filter_leds(filter_idx);
     update_pwm_pattern();
     
     run_model_with_pwm();
@@ -124,10 +109,15 @@ void reset_input_state() {
 }
 
 
+void sleep_and_reset() {
+    turn_off_leds();
+    go_to_sleep();
+    run_startup_animation();
+    reset_input_state();
+}
 
 
 void handle_buttons(){
-    
     int8_t pressed = read_buttons();
     if (pressed == -1) {
         return;
@@ -138,10 +128,10 @@ void handle_buttons(){
             filter_idx = (filter_idx + 1) % N_FILTERS;
         }
         run_model_with_pwm();
-        set_filter_leds();
+        set_filter_leds(filter_idx);
         update_pwm_pattern();
     } else if (pressed == PWR_BUTTON) {
-        go_to_sleep();
+        sleep_and_reset();
     } else {
         uint8_t row = pressed / 5;
         uint8_t col = pressed % 5;
@@ -160,12 +150,10 @@ void main_loop() {
     
     while (1) {
         run_pwm_cycle();
-        if (RTC.CNT > AUTO_SHUTDOWN_TIME_s) {
-            turn_off_leds();
-            go_to_sleep();
-        }
-        
         handle_buttons();
+        if (RTC.CNT > AUTO_SHUTDOWN_TIME_s) {
+            sleep_and_reset();
+        }
     }
 }
 
@@ -208,8 +196,6 @@ int main(void) {
     PORTC.PIN7CTRL |= PORT_PULLUPEN_bm;
     
     
-    
-    
     /* Enable interrupt on power button
      * (this is only for wakeup)*/
     PORTB.PIN3CTRL = (PORTB.PIN3CTRL & ~PORT_ISC_gm) | PORT_ISC_BOTHEDGES_gc;
@@ -242,7 +228,7 @@ int main(void) {
     init_pwm_data();
     
     // sleep
-    go_to_sleep();
+    sleep_and_reset();
     
     main_loop();
     

@@ -1,5 +1,6 @@
 #include "led_control.h"
-#include "config.h"
+#include "../config.h"
+
 #include <stdint.h>
 #include <avr/io.h>
 #include <util/delay.h>
@@ -71,6 +72,21 @@ void set_led_brightness(uint8_t row, uint8_t col, uint8_t val) {
             led_status[(start_idx + i) / 8] &= ~(1 << ((start_idx + i) % 8));
         }
     }
+}
+
+
+void set_filter_leds(uint8_t filter_idx) {
+    if (filter_idx & 1) {PORTB.OUT &= ~PIN6_bm;}
+    else {PORTB.OUT |= PIN6_bm;}
+    
+    if (filter_idx & (1 << 1)) {PORTB.OUT &= ~PIN4_bm;}
+    else {PORTB.OUT |= PIN4_bm;}
+    
+    if (filter_idx & (1 << 2)) {PORTB.OUT &= ~PIN5_bm;}
+    else {PORTB.OUT |= PIN5_bm;}
+    
+    if (filter_idx & (1 << 3)) {set_led_brightness(8, 0, MAX_PWM_LEVEL);}
+    else {set_led_brightness(8, 0, 0);}
 }
 
 

@@ -1,7 +1,8 @@
-#include "config.h"
+#include "../util/led_control.h"
+#include "../config.h"
+
 #include <avr/io.h>
 #include <util/delay.h>
-#include "led_control.h"
 #include <avr/interrupt.h>
 
 

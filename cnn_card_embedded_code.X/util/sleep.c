@@ -1,5 +1,6 @@
 #include "sleep.h"
-#include "config.h"
+#include "../config.h"
+#include "led_control.h"
 
 #include <util/delay.h>
 #include <avr/io.h>
@@ -33,7 +34,4 @@ void go_to_sleep() {
     while (~PORTB.IN & PIN3_bm) {}
     _delay_ms(50);
     reset_rtc_cnt();
-    
-    run_startup_animation();
-    reset_input_state();
 }

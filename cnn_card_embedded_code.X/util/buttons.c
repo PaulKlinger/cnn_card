@@ -1,6 +1,6 @@
 #include "buttons.h"
 #include "sleep.h"
-#include "config.h"
+#include "../config.h"
 
 #include <stdint.h>
 #include <avr/io.h>
