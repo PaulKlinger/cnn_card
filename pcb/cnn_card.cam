@@ -25,7 +25,7 @@
                         "rotate": false,
                         "upside_down": false
                     },
-                    "board_outline": true,
+                    "board_outline": false,
                     "config": {
                         "description": "Mechanical",
                         "file_function": "Other"
@@ -35,7 +35,7 @@
                         46,
                         20
                     ],
-                    "milling": true,
+                    "milling": false,
                     "name": "Mechanical",
                     "polarity": "positive",
                     "type": "gerber_layer"
@@ -231,6 +231,13 @@
             "output_type": "drill",
             "outputs": [
                 {
+                    "advanced_options": {
+                        "mirror": false,
+                        "offset_x": 0,
+                        "offset_y": 0,
+                        "rotate": false,
+                        "upside_down": false
+                    },
                     "drills": {
                         "NPTH": true,
                         "PTH": true,
@@ -250,6 +257,13 @@
             "filename_prefix": "CAMOutputs/Assembly",
             "output_type": "assembly",
             "outputs": [
+                {
+                    "filename_format": "%TEAMHUBNAME/%PROJECTNAME/%ASSEMBLYPREFIX/PnP_%N_%BOARDSIDE",
+                    "header": true,
+                    "name": "Pick and Place",
+                    "output_format": "csv",
+                    "type": "pick_and_place"
+                }
             ]
         },
         {
